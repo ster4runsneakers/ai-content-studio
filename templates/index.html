@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="margin-top:40px; max-width: 980px;">
+  <h2>🎨 AI Content Studio</h2>
+  <p>Δώσε prompt για να δημιουργήσεις <strong>εικόνα</strong> ή <strong>λογότυπο</strong> (OpenAI DALL·E 3).</p>
+
+  <form method="post" id="genForm">
+    <div class="form-group">
+      <textarea name="prompt" rows="3" class="form-control"
+        placeholder="π.χ. Minimal sneaker logo with bold typography — Sneakerness.eu" required></textarea>
+    </div>
+
+    <div class="row g-2 mt-2">
+      <div class="col-md-4">
+        <label class="form-label">Content Type</label>
+        <select name="content_type" class="form-select" id="contentTypeSel">
+          <option value="image" selected>Image</option>
+          <option value="logo">Logo (PNG, transparent)</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Aspect</label>
+        <select name="aspect" class="form-select">
+          {% for a in aspects %}
+            <option value="{{ a }}" {% if a == '1:1' %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+        <small class="text-muted">Includes TikTok, FB, IG, YouTube, Pinterest</small>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Watermark</label>
+        <select name="wm_style" class="form-select" id="wmStyleSel">
+          {% for s in wm_styles %}
+            <option value="{{ s }}" {% if s == 'soft' %}selected{% endif %}>{{ s|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="row g-2 mt-2" id="qualityRow">
+      <div class="col-md-6">
+        <label class="form-label">JPEG quality (images)</label>
+        <select name="quality" class="form-select">
+          <option value="92" selected>92 (default)</option>
+          <option value="85">85 (smaller file)</option>
+          <option value="98">98 (max)</option>
+        </select>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-3" id="genBtn">Generate</button>
+    <a href="{{ url_for('gallery') }}" class="btn btn-secondary mt-3">📷 Gallery</a>
+
+    <div id="loading" style="display:none; margin-top:12px;">
+      <span class="spinner-border spinner-border-sm"></span>
+      <strong>Generating… please wait</strong>
+    </div>
+  </form>
+</div>
+
+<script>
+  const form = document.getElementById('genForm');
+  const btn  = document.getElementById('genBtn');
+  const loading = document.getElementById('loading');
+  const typeSel = document.getElementById('contentTypeSel');
+  const wmSel   = document.getElementById('wmStyleSel');
+  const qualityRow = document.getElementById('qualityRow');
+
+  function syncUI() {
+    const isLogo = typeSel.value === 'logo';
+    wmSel.value = isLogo ? 'none' : wmSel.value;
+    wmSel.disabled = isLogo;
+    qualityRow.style.display = isLogo ? 'none' : 'flex';
+  }
+  typeSel.addEventListener('change', syncUI);
+  document.addEventListener('DOMContentLoaded', syncUI);
+
+  form.addEventListener('submit', () => {
+    btn.disabled = true;
+    loading.style.display = 'block';
+    setTimeout(() => { btn.disabled = false; loading.style.display = 'none'; }, 120000);
+  });
+</script>
+{% endblock %}

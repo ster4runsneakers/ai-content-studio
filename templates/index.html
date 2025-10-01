@@ -18,15 +18,24 @@
           <option value="logo">Logo (PNG, transparent)</option>
         </select>
       </div>
+
       <div class="col-md-4">
         <label class="form-label">Aspect</label>
-        <select name="aspect" class="form-select">
-          {% for a in aspects %}
-            <option value="{{ a }}" {% if a == '1:1' %}selected{% endif %}>{{ a }}</option>
+        <select name="aspect" class="form-select" id="aspectSelect">
+          {% for p in presets %}
+            <option value="{{ p.value }}"
+                    data-help="{{ p.label }}"
+                    data-size="{{ p.w }}×{{ p.h }}"
+                    {% if p.value == '1:1' %}selected{% endif %}>
+              {{ p.value }} — {{ p.label }} ({{ p.w }}×{{ p.h }})
+            </option>
           {% endfor %}
         </select>
-        <small class="text-muted">Includes TikTok, FB, IG, YouTube, Pinterest</small>
+        <small id="aspectHelp" class="text-muted d-block mt-1">
+          Ιδανικό για: {{ presets[0].label }} — {{ presets[0].w }}×{{ presets[0].h }}
+        </small>
       </div>
+
       <div class="col-md-4">
         <label class="form-label">Watermark</label>
         <select name="wm_style" class="form-select" id="wmStyleSel">
@@ -46,6 +55,14 @@
           <option value="98">98 (max)</option>
         </select>
       </div>
+      <div class="col-md-6 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="1" id="cloudOnlyChk" name="cloud_only">
+          <label class="form-check-label" for="cloudOnlyChk">
+            Save to Cloudinary only (skip local)
+          </label>
+        </div>
+      </div>
     </div>
 
     <button type="submit" class="btn btn-primary mt-3" id="genBtn">Generate</button>
@@ -59,6 +76,7 @@
 </div>
 
 <script>
+  // υπάρχουσα λογική
   const form = document.getElementById('genForm');
   const btn  = document.getElementById('genBtn');
   const loading = document.getElementById('loading');
@@ -68,9 +86,14 @@
 
   function syncUI() {
     const isLogo = typeSel.value === 'logo';
-    wmSel.value = isLogo ? 'none' : wmSel.value;
-    wmSel.disabled = isLogo;
-    qualityRow.style.display = isLogo ? 'none' : 'flex';
+    if (isLogo) {
+      wmSel.value = 'none';
+      wmSel.disabled = true;
+      qualityRow.style.display = 'none';
+    } else {
+      wmSel.disabled = false;
+      qualityRow.style.display = 'flex';
+    }
   }
   typeSel.addEventListener('change', syncUI);
   document.addEventListener('DOMContentLoaded', syncUI);
@@ -80,5 +103,18 @@
     loading.style.display = 'block';
     setTimeout(() => { btn.disabled = false; loading.style.display = 'none'; }, 120000);
   });
+
+  // ΝΕΟ: βοήθημα για Aspect/πλατφόρμες
+  const aspectSel  = document.getElementById('aspectSelect');
+  const aspectHelp = document.getElementById('aspectHelp');
+  function updateAspectHelp() {
+    const opt  = aspectSel.selectedOptions[0];
+    if (!opt) return;
+    const help = opt.getAttribute('data-help') || '';
+    const sz   = opt.getAttribute('data-size') || '';
+    aspectHelp.textContent = `Ιδανικό για: ${help} — ${sz}`;
+  }
+  aspectSel.addEventListener('change', updateAspectHelp);
+  document.addEventListener('DOMContentLoaded', updateAspectHelp);
 </script>
 {% endblock %}

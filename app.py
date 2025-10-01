@@ -1,6 +1,6 @@
-import os, io, base64, json, time, requests
+import os, io, base64, json, time, requests, shutil, tempfile
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, send_file, abort
 from dotenv import load_dotenv
 from PIL import Image, ImageDraw, ImageFont
 from openai import OpenAI
@@ -23,13 +23,16 @@ else:
 
 # ── DEBUG SWITCH ────────────────────────────────
 DEBUG_LOG = False
-def log(*args): 
+def log(*args):
     if DEBUG_LOG: print(*args)
 
 # ── FLASK ───────────────────────────────────────
 app = Flask(__name__)
 OUTPUT_DIR = os.path.join("static", "outputs")
+DATA_DIR   = os.path.join("data")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
+LOG_PATH = os.path.join(DATA_DIR, "logs.jsonl")
 
 # ── PRESETS ─────────────────────────────────────
 ASPECT_SIZES = {
@@ -126,7 +129,7 @@ def upload_pil_to_cloudinary(pil_img, public_id, fmt="png", tags=None):
         pil_img = pil_img.convert("RGB")
         pil_img.save(buf, format="JPEG", quality=92)
     else:
-        if pil_img.mode != "RGBA":  # κρατάμε διαφάνεια όπου χρειάζεται (logos)
+        if pil_img.mode != "RGBA":
             pil_img = pil_img.convert("RGBA")
         pil_img.save(buf, format="PNG")
     buf.seek(0)
@@ -157,6 +160,13 @@ def write_metadata(out_path, payload:dict):
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
+def append_log(entry: dict):
+    """Προσθέτει γραμμή σε data/logs.jsonl (JSON Lines)."""
+    entry = dict(entry)
+    entry["logged_at"] = datetime.now().isoformat()
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
 # ── ROUTES ──────────────────────────────────────
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -172,7 +182,6 @@ def index():
             return "<pre>Missing prompt</pre>", 400
 
         width, height = ASPECT_SIZES.get(aspect, (1024,1024))
-        # OpenAI images API: μη-τετράγωνα → ζητάμε 1024x1024 και κάνουμε resize τοπικά
         size_str = f"{width}x{height}" if width==height else "1024x1024"
 
         final_prompt = user_prompt
@@ -183,7 +192,7 @@ def index():
         try:
             result = generate_with_openai(final_prompt, size_str=size_str)
 
-            # Λήψη εικόνας → PIL
+            # OpenAI → PIL
             if result["url"]:
                 resp = requests.get(result["url"], timeout=120)
                 resp.raise_for_status()
@@ -194,7 +203,7 @@ def index():
             else:
                 return "<pre>No image returned from OpenAI (check verification/limits).</pre>", 500
 
-            # Post-process (resize + watermark/transparency)
+            # Post-process
             safe_aspect = aspect.replace(":", "x")
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             prefix = f"{'logo' if (content_type == 'logo') else 'gen'}_{safe_aspect}"
@@ -213,8 +222,8 @@ def index():
                 img = add_watermark(img, style=wm_style)
                 final_fmt = "jpg"
 
-            cloud_url = None
             # Cloud upload (αν υπάρχει CLOUDINARY_URL)
+            cloud_url = None
             if CLOUDINARY_URL:
                 tags = [f"aspect:{safe_aspect}", f"type:{content_type}"]
                 if content_type != "logo":
@@ -223,7 +232,7 @@ def index():
                 if cloud_url:
                     print("Cloud URL:", cloud_url)
 
-            # Local save (αν ΔΕΝ είναι cloud_only)
+            # Local save (εκτός αν είναι cloud_only)
             out_web_path = None
             if not cloud_only:
                 ext = "png" if (final_fmt == "png") else "jpg"
@@ -240,13 +249,36 @@ def index():
                     "watermark_style": ("none" if content_type == "logo" else wm_style),
                     "created_at": datetime.now().isoformat(),
                     "file": out_path.replace("\\", "/"),
-                    "cloudinary_url": cloud_url
+                    "cloudinary_url": cloud_url,
+                    "cloud_only": cloud_only
                 }
                 write_metadata(out_path, payload)
+                # γράψε log
+                append_log({
+                    "prompt": user_prompt,
+                    "aspect": aspect,
+                    "type": content_type,
+                    "size": f"{width}x{height}",
+                    "wm": ("none" if content_type == "logo" else wm_style),
+                    "quality": (None if content_type == "logo" else quality),
+                    "local_file": payload["file"],
+                    "cloud_url": cloud_url,
+                    "cloud_only": cloud_only,
+                })
                 out_web_path = f"/static/outputs/{os.path.basename(out_path)}"
             else:
-                # cloud-only: δεν γράφουμε τοπικό αρχείο
-                pass
+                # cloud-only: δεν γράφουμε τοπικό αρχείο, μόνο log
+                append_log({
+                    "prompt": user_prompt,
+                    "aspect": aspect,
+                    "type": content_type,
+                    "size": f"{width}x{height}",
+                    "wm": ("none" if content_type == "logo" else wm_style),
+                    "quality": (None if content_type == "logo" else quality),
+                    "local_file": None,
+                    "cloud_url": cloud_url,
+                    "cloud_only": cloud_only,
+                })
 
             return redirect(url_for("gallery"))
 
@@ -265,12 +297,12 @@ def gallery():
     """Συνδυαστική gallery: Cloudinary (αν υπάρχει) + τοπικά αρχεία."""
     items = []
 
-    # 1) Cloudinary assets (νεότερα πρώτα)
+    # 1) Cloudinary assets
     if CLOUDINARY_URL:
         try:
             res = cloudinary.api.resources(
                 type="upload",
-                prefix=CLOUDINARY_FOLDER + "/",  # μόνο ο φάκελος μας
+                prefix=CLOUDINARY_FOLDER + "/",
                 max_results=100,
                 direction="desc",
                 context=False,
@@ -303,18 +335,40 @@ def gallery():
             "mtime": mtime
         })
 
-    # Κανονικοποίηση mtime για sort: ISO string → timestamp
     def to_ts(m):
         if isinstance(m, (int, float)): return float(m)
-        # Cloudinary created_at e.g. "2025-10-01T16:22:33Z"
         try:
             return datetime.fromisoformat(m.replace("Z","+00:00")).timestamp()
         except:
             return 0.0
 
     items.sort(key=lambda x: to_ts(x["mtime"]), reverse=True)
-    files = [it["url"] for it in items]  # το template περιμένει σκέτα URLs
+    files = [it["url"] for it in items]
     return render_template("gallery.html", files=files)
+
+@app.route("/logs")
+def logs():
+    """Απλά debug logs από data/logs.jsonl (πιο πρόσφατα πρώτα)."""
+    if not os.path.exists(LOG_PATH):
+        entries = []
+    else:
+        with open(LOG_PATH, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        entries = [json.loads(ln) for ln in lines if ln.strip()]
+        entries.reverse()
+    return render_template("logs.html", entries=entries)
+
+@app.route("/backup")
+def backup():
+    """Δημιουργεί ZIP του static/outputs και το κατεβάζει."""
+    if not os.path.isdir(OUTPUT_DIR):
+        abort(404)
+    # temp zip
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    tmp_dir = tempfile.mkdtemp()
+    zip_base = os.path.join(tmp_dir, f"outputs_{ts}")
+    zip_path = shutil.make_archive(zip_base, "zip", OUTPUT_DIR)
+    return send_file(zip_path, as_attachment=True, download_name=f"outputs_{ts}.zip")
 
 @app.route("/health")
 def health():

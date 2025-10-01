@@ -1,49 +1,100 @@
+/* === THEME VARIABLES === */
 :root {
-  --bg: #f9f9f9;
-  --text: #111;
-  --card-bg: #fff;
-  --muted: #6c757d;
-  --border: rgba(0,0,0,0.1);
-  --primary: #0d6efd;
-  --primary-hover: #0b5ed7;
-  --shadow: 0 4px 12px rgba(0,0,0,0.08);
+  --bg: #ffffff;
+  --text: #1f2937;     /* slate-800 */
+  --muted: #6b7280;    /* slate-500 */
+  --card: #ffffff;
+  --border: #e5e7eb;   /* slate-200 */
+  --brand: #0d6efd;    /* bootstrap primary */
+  --header-bg: #f8f9fa;
+  --header-text: #111827; /* slate-900 */
 }
-.dark-theme {
-  --bg: #0f1115;
-  --text: #e7e9ee;
-  --card-bg: #151923;
-  --muted: #9aa3b2;
-  --border: rgba(255,255,255,0.08);
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --shadow: 0 6px 18px rgba(0,0,0,0.35);
+
+:root[data-theme="dark"] {
+  --bg: #0f0f0f;
+  --text: #e5e7eb;     /* slate-200 */
+  --muted: #9ca3af;    /* slate-400 */
+  --card: #151515;
+  --border: #2a2a2a;
+  --brand: #3b82f6;    /* a bit softer in dark */
+  --header-bg: #141414;
+  --header-text: #f3f4f6;
 }
-html, body { background: var(--bg); color: var(--text); }
-.navbar { box-shadow: var(--shadow); }
-.navbar.bg-dark { background-color: #0b0f17 !important; }
-.navbar.bg-dark .navbar-brand,
-.navbar.bg-dark .navbar-nav .nav-link { color: #f8f9fa !important; opacity: .9; }
-.navbar.bg-dark .navbar-nav .nav-link:hover { opacity: 1; }
-.navbar.bg-dark .theme-toggle { color: #f8f9fa; border-color: rgba(255,255,255,.25); background: transparent; }
-textarea.form-control {
-  background: var(--card-bg); color: var(--text);
+
+/* system auto (όταν δεν έχει οριστεί manual theme) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #0f0f0f;
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+    --card: #151515;
+    --border: #2a2a2a;
+    --brand: #3b82f6;
+    --header-bg: #141414;
+    --header-text: #f3f4f6;
+  }
+}
+
+/* === BASE COLORS === */
+html, body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+header, .navbar, .topbar {
+  background: var(--header-bg) !important;
+  color: var(--header-text) !important;
+  border-bottom: 1px solid var(--border);
+}
+header a, .navbar a, .topbar a {
+  color: var(--header-text) !important;
+}
+
+/* Containers */
+main .container {
+  color: var(--text);
+}
+
+/* Cards */
+.card {
+  background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px; padding: 12px; font-size: 1.1rem;
+  color: var(--text);
 }
-.btn { border-radius: 12px; padding: 12px 20px; font-size: 1.05rem; }
-.btn-primary { background-color: var(--primary); border: none; }
-.btn-primary:hover { background-color: var(--primary-hover); }
-.btn-secondary { background-color: #6c757d; border: none; }
-.btn-secondary:hover { background-color: #545b62; }
-.card { background: var(--card-bg); color: var(--text); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); }
-.card-img-top { border-radius: 16px 16px 0 0; }
-footer { background: var(--card-bg) !important; color: var(--muted); border-top: 1px solid var(--border); }
-@media (max-width: 768px) {
-  h2 { font-size: 1.5rem; text-align: center; }
-  textarea.form-control { font-size: 1rem; }
-  .btn { width: 100%; margin-bottom: 10px; }
-  .navbar-brand { font-size: 1.2rem; }
+.card .card-body { color: var(--text); }
+
+/* Forms */
+.form-control,
+.form-select {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
-.theme-toggle { display: inline-flex; align-items: center; gap: .5rem; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); cursor: pointer; user-select: none; }
-.theme-toggle .dot { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #ffd166 0%, #fca311 100%); box-shadow: inset 0 0 0 2px rgba(0,0,0,.08); }
-.dark-theme .theme-toggle .dot { background: radial-gradient(circle at 30% 30%, #cbd5e1 0%, #64748b 60%, #1f2937 100%); }
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.15);
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.btn-outline-secondary {
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn-outline-secondary:hover {
+  background: var(--card);
+}
+
+/* Text */
+.text-muted { color: var(--muted) !important; }
+
+/* Gallery grid helper (αν το χρειαστείς με απλά divs) */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}

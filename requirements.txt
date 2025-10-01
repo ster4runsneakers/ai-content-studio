@@ -1,8 +1,8 @@
 ﻿flask
-openai
 python-dotenv
 pillow
-requests
-gunicorn
+openai
 cloudinary
+gunicorn
+requests
 

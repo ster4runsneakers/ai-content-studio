@@ -1,23 +1,16 @@
-﻿# Python env
+﻿# venv / IDE
 .venv/
 venv/
+.env
 __pycache__/
 *.pyc
-*.pyo
-
-# Local env / secrets
-.env
-.env.local
-.env.*.local
-
-# Outputs / uploads
-static/outputs/
-*.sqlite3
-
-# IDE files
-.vscode/
 .idea/
-.DS_Store
+.vscode/
 
-# Archives / zips
-*.zip
+# local outputs (κρατάμε μόνο .gitkeep)
+static/outputs/*
+!static/outputs/.gitkeep
+
+# local logs/data (κρατάμε μόνο .gitkeep)
+data/*
+!data/.gitkeep

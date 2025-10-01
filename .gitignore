@@ -1,5 +1,23 @@
-﻿.venv/
+﻿# Python env
+.venv/
+venv/
 __pycache__/
 *.pyc
-static/outputs/*
+*.pyo
+
+# Local env / secrets
 .env
+.env.local
+.env.*.local
+
+# Outputs / uploads
+static/outputs/
+*.sqlite3
+
+# IDE files
+.vscode/
+.idea/
+.DS_Store
+
+# Archives / zips
+*.zip

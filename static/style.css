@@ -103,6 +103,7 @@ main .container {
 /* 1) Links/brand στην μπάρα να ακολουθούν το header-text */
 .navbar .navbar-brand,
 .navbar .nav-link,
+.dropdown-menu .dropdown-item { text-decoration: none; }
 .navbar .dropdown-toggle {
   color: var(--header-text) !important;
 }

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="margin-top:40px; max-width: 980px;">
+  <h2>✍️ Captions / Hook / CTA ανά πλατφόρμα</h2>
+  <p class="text-muted">Δώσε στοιχεία προϊόντος & επίλεξε πλατφόρμα. Θα παραχθούν Hook, Caption, CTA & Hashtags (GR/EN).</p>
+
+  <form method="post" class="mt-3" id="capForm">
+    <div class="row g-2">
+      <div class="col-md-6">
+        <label class="form-label">Πλατφόρμα</label>
+        <select class="form-select" name="platform" required>
+          <option value="instagram" selected>Instagram</option>
+          <option value="tiktok">TikTok</option>
+          <option value="facebook">Facebook</option>
+          <option value="pinterest">Pinterest</option>
+          <option value="youtube">YouTube</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Γλώσσα</label>
+        <select class="form-select" name="lang" required>
+          <option value="el" selected>Ελληνικά</option>
+          <option value="en">English</option>
+          <option value="el+en">Δίγλωσσο (GR+EN)</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Ύφος</label>
+        <select class="form-select" name="tone" required>
+          <option value="friendly" selected>Friendly</option>
+          <option value="energetic">Energetic</option>
+          <option value="minimal">Minimal</option>
+          <option value="premium">Premium</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row g-2 mt-2">
+      <div class="col-md-6">
+        <label class="form-label">Brand / Model</label>
+        <input type="text" class="form-control" name="product" placeholder="π.χ. adidas Adizero Evo SL" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">USP / Λεπτομέρειες</label>
+        <input type="text" class="form-control" name="details" placeholder="π.χ. super-light, responsive foam, race-day">
+        <small class="text-muted">USP = Unique Selling Points (ό,τι το κάνει να ξεχωρίζει)</small>
+      </div>
+    </div>
+
+    <div class="row g-2 mt-2">
+      <div class="col-md-6">
+        <label class="form-label">Target / Season</label>
+        <input type="text" class="form-control" name="audience" placeholder="π.χ. runners, marathon prep, autumn">
+        <small class="text-muted">Σε ποιους μιλάμε & για ποια περίσταση/σεζόν</small>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">#Hashtags</label>
+        <input type="number" class="form-control" name="num_hashtags" value="8" min="0" max="20">
+      </div>
+      <div class="col-md-3 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="use_emojis" value="1" checked id="emChk">
+          <label class="form-check-label" for="emChk">Emojis</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-2">
+      <label class="form-label">Extra οδηγίες (optional)</label>
+      <textarea class="form-control" name="extra" rows="2" placeholder="π.χ. βάλε call-out για -10% με κωδικό SNEAK10"></textarea>
+    </div>
+
+    <button class="btn btn-primary mt-3" type="submit" id="genBtn">Generate Captions</button>
+    <a class="btn btn-secondary mt-3" href="{{ url_for('logs') }}">🧾 Logs</a>
+  </form>
+
+  {% if result %}
+  <hr class="my-4">
+  <h5>Αποτέλεσμα</h5>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Hook</h6>
+        <button class="btn btn-sm btn-outline-secondary" onclick="copyById('resultHook')">Copy</button>
+      </div>
+      <pre id="resultHook" class="mt-2" style="white-space:pre-wrap">{{ result.hook }}</pre>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Caption</h6>
+        <button class="btn btn-sm btn-outline-secondary" onclick="copyById('resultCaption')">Copy</button>
+      </div>
+      <pre id="resultCaption" class="mt-2" style="white-space:pre-wrap">{{ result.caption }}</pre>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">CTA</h6>
+        <button class="btn btn-sm btn-outline-secondary" onclick="copyById('resultCTA')">Copy</button>
+      </div>
+      <pre id="resultCTA" class="mt-2" style="white-space:pre-wrap">{{ result.cta }}</pre>
+    </div>
+  </div>
+
+  {% if result.hashtags %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Hashtags</h6>
+        <button class="btn btn-sm btn-outline-secondary" onclick="copyById('resultTags')">Copy</button>
+      </div>
+      <pre id="resultTags" class="mt-2" style="white-space:pre-wrap">{{ result.hashtags|join(' ') }}</pre>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary" onclick="copyAll()">📋 Copy All</button>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function copyById(id) {
+  const el = document.getElementById(id);
+  if (!el) return alert('Nothing to copy.');
+  const text = el.innerText || el.textContent || '';
+  navigator.clipboard.writeText(text.trim());
+  alert('Copied ✓');
+}
+function copyAll() {
+  const ids = ['resultHook','resultCaption','resultCTA','resultTags'];
+  let text = '';
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) text += el.innerText + '\n\n';
+  });
+  navigator.clipboard.writeText(text.trim());
+  alert('All copied ✓');
+}
+</script>
+{% endblock %}

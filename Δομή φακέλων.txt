@@ -1,0 +1,11 @@
+your-project/
+├─ app.py
+├─ models.py
+├─ routes_ab.py
+├─ templates/
+│  ├─ base.html
+│  ├─ home.html
+│  ├─ ab_new.html
+│  └─ ab_view.html
+└─ static/
+   └─ (assets αν χρειαστούν)

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}A/B Test · {{ test.name }}{% endblock %}
+
+{% block content %}
+<h1>A/B Test: {{ test.name }}</h1>
+
+{% if winner %}
+<div class="card" style="border-left:4px solid #2e7d32; margin-bottom:16px">
+  <strong>Winner:</strong> Variant {{ winner.label }}
+  (CTR {{ '%.2f%%' % (winner.ctr*100) }}, p={{ '%.3f' % winner.p_value }})
+</div>
+{% endif %}
+
+<div class="card">
+  <h3 style="margin-top:0">Τρέχον caption</h3>
+  <pre id="caption"></pre>
+  <div class="actions" style="display:flex;gap:10px;flex-wrap:wrap">
+    <button id="copyBtn" class="btn" onclick="copyCaption()" disabled>Copy caption</button>
+    <a id="openLink" class="btn" href="#" target="_blank" onclick="onOpenLink()">Open link</a>
+    <button class="btn" onclick="loadVariant()">Next variant</button>
+    <a class="btn" href="{{ url_for('ab.export_csv', test_id=test.id) }}">Export CSV</a>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <h3 style="margin:0">Μετρικές</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn" href="{{ url_for('ab.export_csv', test_id=test.id) }}">Export CSV</a>
+      <form method="post" action="{{ url_for('ab.toggle_active', test_id=test.id) }}">
+        <button class="btn" type="submit">{{ "Deactivate" if test.is_active else "Activate" }}</button>
+      </form>
+      <form method="post" action="{{ url_for('ab.duplicate_test', test_id=test.id) }}">
+        <button class="btn" type="submit">Duplicate</button>
+      </form>
+      <form method="post" action="{{ url_for('ab.delete_test', test_id=test.id) }}" onsubmit="return confirm('Delete this test; are you sure?')">
+        <button class="btn" type="submit">Delete</button>
+      </form>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Variant</th><th>Impr.</th><th>Copies</th><th>Clicks</th><th>CTR</th><th>Copy Rate</th></tr>
+    </thead>
+    <tbody>
+      {% for v in test.variants %}
+        {% set ctr = (v.clicks / v.impressions) if v.impressions else 0 %}
+        {% set cpr = (v.copies / v.impressions) if v.impressions else 0 %}
+        <tr>
+          <td>{{ v.label }}</td>
+          <td>{{ v.impressions }}</td>
+          <td>{{ v.copies }}</td>
+          <td>{{ v.clicks }}</td>
+          <td>{{ '%.2f%%' % (ctr*100) }}</td>
+          <td>{{ '%.2f%%' % (cpr*100) }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadVariant() {
+  const res = await fetch(`/ab/serve/{{ test.id }}`);
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  window.currentVariant = data;
+  document.getElementById("caption").textContent = data.text;
+  document.getElementById("copyBtn").disabled = false;
+  const link = document.getElementById("openLink");
+  if (data.target_url) {
+    link.href = data.target_url + (data.target_url.includes('?') ? '&' : '?') + 'v=' + data.variant_id;
+    link.style.display = 'inline-block';
+  } else { link.style.display = 'none'; }
+}
+async function track(eventName) {
+  if (!window.currentVariant) return;
+  await fetch(`/ab/event`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      test_id: window.currentVariant.test_id,
+      variant_id: window.currentVariant.variant_id,
+      event: eventName
+    })
+  });
+}
+async function copyCaption() {
+  const text = document.getElementById("caption").textContent;
+  await navigator.clipboard.writeText(text);
+  await track("copy");
+  alert("✅ Copied!");
+}
+async function onOpenLink() { await track("click"); }
+window.addEventListener("load", loadVariant);
+</script>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}CSE{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="card p-3">
+    <h1 class="h3 mb-3">Google CSE (Image Search)</h1>
+    {% if error %}<p class="mb-3" style="color:#b00020">{{ error }}</p>{% endif %}
+
+    <form method="post" class="row g-3">
+      <div class="col-12">
+        <label class="form-label">Search</label>
+        <input class="form-control" type="text" name="q" value="{{ q or '' }}"
+               placeholder="π.χ. running shoes product photo">
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label">Aspect</label>
+        <select class="form-select" name="aspect" id="aspect-select">
+          <option value="any" {{ "selected" if aspect=="any" else "" }}>Any</option>
+          {% for a in aspects %}
+            <option value="{{ a }}" {{ "selected" if aspect==a else "" }}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {% if presets %}
+      <div class="col-12">
+        <div class="d-flex flex-wrap gap-2">
+          {% for label, akey in presets.items() %}
+            <button class="btn btn-sm btn-outline-secondary" type="button"
+                    data-aspect="{{ akey }}" onclick="setAspect(this)">{{ label }}</button>
+          {% endfor %}
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  data-aspect="any" onclick="setAspect(this)">Any</button>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="col-12">
+        <button class="btn btn-primary" type="submit">Search</button>
+      </div>
+    </form>
+  </div>
+
+  {% if results %}
+  <div class="card p-3 mt-3">
+    <h3 class="h5 mb-3">Results</h3>
+    <div class="row g-3">
+      {% for it in results %}
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="border rounded-3 p-2 h-100">
+          {% if it.thumbnail %}
+          <a href="{{ it.link }}" target="_blank" rel="noopener">
+            <img src="{{ it.thumbnail }}" alt="" class="img-fluid rounded-2 mb-2">
+          </a>
+          {% endif %}
+          <a href="{{ it.link }}" target="_blank" rel="noopener" class="text-decoration-none">
+            {{ it.title }}
+          </a>
+          {% if it.width and it.height %}
+          <div><small class="text-muted">{{ it.width }}×{{ it.height }}</small></div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setAspect(el) {
+  const val = el.getAttribute("data-aspect");
+  const sel = document.getElementById("aspect-select");
+  if (!sel) return;
+  for (let i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === val) { sel.selectedIndex = i; break; }
+  }
+}
+</script>
+{% endblock %}

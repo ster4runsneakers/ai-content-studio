@@ -33,6 +33,23 @@ DATA_DIR   = os.path.join("data")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 LOG_PATH = os.path.join(DATA_DIR, "logs.jsonl")
+# --- SQLAlchemy για το A/B module ---
+from models import db
+
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///app.db")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db.init_app(app)
+with app.app_context():
+    db.create_all()  # για αρχή, να φτιαχτούν οι πίνακες
+
+# --- Blueprint για A/B Captions ---
+from routes_ab import ab_bp
+from routes_media import media_bp      # <-- ΕΔΩ
+app.register_blueprint(ab_bp)   # θα ζει κάτω από /ab/...
+app.register_blueprint(media_bp)       # <-- ΕΔΩ
+
+
 
 # ── PRESETS ─────────────────────────────────────
 ASPECT_SIZES = {
@@ -166,6 +183,55 @@ def append_log(entry: dict):
     entry["logged_at"] = datetime.now().isoformat()
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+# === CAPTIONS (text) ======================================
+def generate_captions(prompt: str, platform: str = "tiktok", n: int = 3):
+    if not client:
+        raise RuntimeError("OPENAI_API_KEY missing")
+    sys = (
+        "Είσαι βοηθός που γράφει σύντομα, δυνατά captions για social. "
+        "Χρησιμοποίησε Ελληνικά, emojis με φειδώ, σαφή CTA, και 1-2 hashtags."
+    )
+    usr = f"Πλατφόρμα: {platform}\nΓράψε {n} σύντομα captions για: {prompt}"
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role":"system","content":sys},{"role":"user","content":usr}],
+        temperature=0.7
+    )
+    text = resp.choices[0].message.content.strip()
+    # Σπάσιμο σε bullets/γραμμές
+    out = [line.strip("•- ").strip() for line in text.split("\n") if line.strip()]
+    return out[:n] if out else [text]
+
+@app.route("/captions", methods=["GET","POST"])
+def captions():
+    results = []
+    error = None
+    if request.method == "POST":
+        prompt = (request.form.get("prompt") or "").strip()
+        platform = (request.form.get("platform") or "tiktok").strip()
+        n = int(request.form.get("n") or 3)
+        if not prompt:
+            error = "Δώσε prompt."
+        else:
+            try:
+                results = generate_captions(prompt, platform, n)
+                append_log({"type":"captions","platform":platform,"prompt":prompt,"n":n})
+            except Exception as e:
+                error = f"{e}"
+        return render_template("captions.html", results=results, error=error,
+                               platform=platform, prompt=prompt, n=n)
+    return render_template("captions.html", results=results, error=error, platform="tiktok", n=3)
+
+
+# === UPLOAD (εισαγωγή εικόνας + optional watermark + cloud) ===
+
+
+
+
+# === GOOGLE CSE (προαιρετικό) ===============================
+
+
 
 # ── ROUTES ──────────────────────────────────────
 @app.route("/", methods=["GET", "POST"])

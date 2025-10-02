@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Upload{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="card p-3">
+    <h1 class="h3 mb-3">Upload Image</h1>
+    {% if error %}<p class="mb-3" style="color:#b00020">{{ error }}</p>{% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">Εικόνα</label>
+        <input class="form-control" type="file" name="file" accept="image/*" required>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">Watermark</label>
+        <select class="form-select" name="wm_style">
+          <option value="soft">soft</option>
+          <option value="badge">badge</option>
+          <option value="none">none</option>
+        </select>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">JPEG quality</label>
+        <input class="form-control" type="number" name="quality" value="92" min="60" max="100" step="1">
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label">Aspect</label>
+        <select class="form-select" name="aspect" id="aspect-select">
+          <option value="original">Original</option>
+          {% for a in aspects %}
+            <option value="{{ a }}">{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {% if presets %}
+      <div class="col-12">
+        <div class="d-flex flex-wrap gap-2">
+          {% for label, akey in presets.items() %}
+            <button class="btn btn-sm btn-outline-secondary" type="button"
+                    data-aspect="{{ akey }}" onclick="setAspect(this)">{{ label }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="col-12">
+        <button class="btn btn-primary" type="submit">Upload</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setAspect(el) {
+  const val = el.getAttribute("data-aspect");
+  const sel = document.getElementById("aspect-select");
+  if (!sel) return;
+  for (let i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === val) { sel.selectedIndex = i; break; }
+  }
+}
+</script>
+{% endblock %}

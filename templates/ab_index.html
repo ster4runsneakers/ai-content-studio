@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}A/B Tests{% endblock %}
+{% block content %}
+<h1 style="margin-top:0">A/B Tests</h1>
+<div class="card">
+  {% if rows|length == 0 %}
+    <p>Δεν υπάρχουν tests ακόμα. <a class="btn" href="{{ url_for('ab.create_test') }}">Νέο test</a></p>
+  {% else %}
+  <table>
+    <thead>
+      <tr>
+        <th>Όνομα</th><th>Platform</th><th>Active</th>
+        <th>Impr.</th><th>Clicks</th><th>CTR</th><th>Copy Rate</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><a href="{{ url_for('ab.view_test', test_id=r.test.id) }}">{{ r.test.name }}</a></td>
+        <td>{{ r.test.platform }}</td>
+        <td>{{ "✅" if r.test.is_active else "—" }}</td>
+        <td>{{ r.total_impr }}</td>
+        <td>{{ r.total_clicks }}</td>
+        <td>{{ '%.2f%%' % (r.ctr*100) }}</td>
+        <td>{{ '%.2f%%' % (r.copy_rate*100) }}</td>
+        <td style="white-space:nowrap">
+          <form method="post" action="{{ url_for('ab.toggle_active', test_id=r.test.id) }}" style="display:inline"><button class="btn" type="submit">{{ "Deactivate" if r.test.is_active else "Activate" }}</button></form>
+          <form method="post" action="{{ url_for('ab.duplicate_test', test_id=r.test.id) }}" style="display:inline"><button class="btn" type="submit">Duplicate</button></form>
+          <form method="post" action="{{ url_for('ab.delete_test', test_id=r.test.id) }}" style="display:inline" onsubmit="return confirm('Delete this test; are you sure?')"><button class="btn" type="submit">Delete</button></form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

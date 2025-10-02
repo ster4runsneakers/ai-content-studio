@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Νέο A/B Test{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Νέο A/B Test για Captions</h1>
+  {% if error %}<p style="color:#b00020">{{ error }}</p>{% endif %}
+  <form method="post" class="grid">
+    <div>
+      <label>Όνομα Test</label><br>
+      <input name="name" style="width:100%">
+    </div>
+    <div>
+      <label>Πλατφόρμα</label><br>
+      <select name="platform" style="width:100%">
+        <option value="tiktok">TikTok</option>
+        <option value="instagram">Instagram</option>
+        <option value="pinterest">Pinterest</option>
+      </select>
+    </div>
+    <div>
+      <label>Target URL (UTM/Bitly)</label><br>
+      <input name="target_url" style="width:100%">
+    </div>
+    {% for lbl in ["A","B","C","D"] %}
+    <fieldset style="border:1px dashed #e6e6e6;padding:12px;border-radius:10px">
+      <legend>Variant {{ lbl }}</legend>
+      <textarea name="text_{{ lbl }}" rows="4" style="width:100%"></textarea><br>
+      <label>Weight</label>
+      <input type="number" name="weight_{{ lbl }}" step="0.1" value="1">
+    </fieldset>
+    {% endfor %}
+    <button class="btn" type="submit">Δημιουργία</button>
+  </form>
+</div>
+{% endblock %}

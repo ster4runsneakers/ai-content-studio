@@ -1,9 +1,0 @@
-ZipArchiveHelper : † §¨æ©™˜©ž ©«¦ ˜¨®œå¦ 'G:\ai-content-studio\ai_content_studio_pipeline_plus\$null' ›œ¤ œå¤˜  ›¬¤˜«ã 
-š ˜ «ž ©¬š¡œ¡¨ £â¤ž › œ¨š˜©å˜, œ§œ ›ã «¦ ˜¨®œå¦ ®¨ž© £¦§¦ œå«˜  ˜§æ á¢¢ž › œ¨š˜©å˜.
-At C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules\Microsoft.PowerShell.Archive\Microsoft.PowerShell.Archive.psm1:63
-2 char:30
-+ ... sArchived = ZipArchiveHelper $sourceFilePaths $destinationPath $compr ...
-+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : PermissionDenied: (G:\ai-content-s...line_plus\$null:String) [Write-Error], IOException
-    + FullyQualifiedErrorId : CompressArchiveUnauthorizedAccessError,ZipArchiveHelper
- 

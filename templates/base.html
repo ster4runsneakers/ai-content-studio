@@ -24,23 +24,18 @@
       <!-- Collapsible content -->
       <div class="collapse navbar-collapse" id="topnav">
         <ul class="navbar-nav ms-auto align-items-lg-center">
-          <!-- Quick links -->
+          <!-- Quick links (εμφανίζονται σε desktop, και μέσα στο μενού σε mobile) -->
           <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Home</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery') }}">Gallery</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('logs') }}">Logs</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('backup') }}">Backup (ZIP)</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('captions') }}">Captions</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('media.upload') }}">Upload</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('media.cse') }}">CSE</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('ab.index') }}">A/B Tests</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('ab.create_test') }}">A/B Captions</a></li>
 
-          <!-- Divider -->
+          <!-- Divider (μόνο οπτικά) -->
           <li class="nav-item d-none d-lg-block">
             <span class="mx-2" style="opacity:.4">|</span>
           </li>
 
-          <!-- Dropdown: Menu -->
+          <!-- Dropdown: Menu (περιλαμβάνει και το Theme) -->
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle btn btn-sm btn-outline-secondary px-3"
                href="#" id="menuDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -51,23 +46,16 @@
               <li><a class="dropdown-item" href="{{ url_for('gallery') }}">Gallery</a></li>
               <li><a class="dropdown-item" href="{{ url_for('logs') }}">Logs</a></li>
               <li><a class="dropdown-item" href="{{ url_for('backup') }}">Backup (ZIP)</a></li>
-              <li><a class="dropdown-item" href="{{ url_for('captions') }}">Captions</a></li>
-              <li><a class="dropdown-item" href="{{ url_for('media.upload') }}">Upload</a></li>
-              <li><a class="dropdown-item" href="{{ url_for('media.cse') }}">CSE</a></li>
-              <li><a class="dropdown-item" href="{{ url_for('ab.index') }}">A/B Tests</a></li>
-              <li><a class="dropdown-item" href="{{ url_for('ab.create_test') }}">A/B Captions</a></li>
-
               <li><hr class="dropdown-divider"></li>
-              <li><h6 class="dropdown-header">Theme</h6></li>
+              <li class="px-3 py-2 text-muted small">Theme</li>
               <li><a class="dropdown-item theme-option" data-theme="auto"  href="#">Auto (System)</a></li>
               <li><a class="dropdown-item theme-option" data-theme="light" href="#">Light</a></li>
               <li><a class="dropdown-item theme-option" data-theme="dark"  href="#">Dark</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li class="px-3">
+                <span id="themeBadge" class="badge bg-secondary">Theme: Auto</span>
+              </li>
             </ul>
-          </li>
-
-          <!-- Theme badge (desktop μόνο) -->
-          <li class="nav-item d-none d-lg-block ms-2">
-            <span id="themeBadge" class="badge rounded-pill bg-secondary">Theme: Auto</span>
           </li>
         </ul>
       </div>
@@ -128,8 +116,5 @@
       document.addEventListener('DOMContentLoaded', loadTheme);
     })();
   </script>
-
-  <!-- Page-level scripts -->
-  {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -166,6 +166,40 @@ def log(*args):
 
 # ── FLASK ───────────────────────────────────────
 app = Flask(__name__)
+# ===== NAV CONFIG (pinned + more) =====
+from flask import current_app
+
+NAV_ITEMS = [
+    {"label": "Home",          "candidates": ["index"],                         "pinned": True},
+    {"label": "Gallery",       "candidates": ["gallery"],                       "pinned": True},
+    {"label": "Captions",      "candidates": ["captions"],                      "pinned": True},
+
+    {"label": "Upload",        "candidates": ["upload"],                        "pinned": False},
+    {"label": "CSE",           "candidates": ["cse"],                           "pinned": False},
+    {"label": "A/B Tests",     "candidates": ["ab.index"],                      "pinned": False},
+    {"label": "A/B Captions",  "candidates": ["ab.create_test"],                "pinned": False},
+    {"label": "Logs",          "candidates": ["logs"],                          "pinned": False},
+    {"label": "Backup (ZIP)",  "candidates": ["backup"],                        "pinned": False},
+]
+
+def _resolve_endpoint(candidates):
+    for ep in candidates:
+        if ep in current_app.view_functions:
+            return ep
+    return None
+
+@app.context_processor
+def inject_nav():
+    resolved = []
+    for it in NAV_ITEMS:
+        ep = _resolve_endpoint(it["candidates"])
+        if ep:
+            resolved.append({"label": it["label"], "endpoint": ep, "pinned": it.get("pinned", False)})
+    nav_pinned = [i for i in resolved if i["pinned"]]
+    nav_more   = [i for i in resolved if not i["pinned"]]
+    return {"nav_pinned": nav_pinned, "nav_more": nav_more}
+# ===== /NAV CONFIG =====
+
 OUTPUT_DIR = os.path.join("static", "outputs")
 DATA_DIR   = os.path.join("data")
 os.makedirs(OUTPUT_DIR, exist_ok=True)

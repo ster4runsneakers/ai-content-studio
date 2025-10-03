@@ -27,6 +27,7 @@
           <!-- Quick links (εμφανίζονται σε desktop, και μέσα στο μενού σε mobile) -->
           <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Home</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery') }}">Gallery</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('captions') }}">Captions</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('logs') }}">Logs</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('backup') }}">Backup (ZIP)</a></li>
 
@@ -44,6 +45,7 @@
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="menuDropdown">
               <li><a class="dropdown-item" href="{{ url_for('index') }}">Home</a></li>
               <li><a class="dropdown-item" href="{{ url_for('gallery') }}">Gallery</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('captions') }}">Captions</a></li>
               <li><a class="dropdown-item" href="{{ url_for('logs') }}">Logs</a></li>
               <li><a class="dropdown-item" href="{{ url_for('backup') }}">Backup (ZIP)</a></li>
               <li><hr class="dropdown-divider"></li>

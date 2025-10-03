@@ -12,56 +12,66 @@
 </head>
 <body>
   <header class="border-bottom">
-    <nav class="navbar navbar-expand-lg px-3">
-      <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">AI Content Studio</a>
+    <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom">
+  <div class="container">
+    <a class="navbar-brand fw-semibold" href="{{ url_for('index') }}">AI Content Studio</a>
 
-      <!-- Hamburger -->
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topnav"
-              aria-controls="topnav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topnav"
+            aria-controls="topnav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
 
-      <!-- Collapsible content -->
-      <div class="collapse navbar-collapse" id="topnav">
-        <ul class="navbar-nav ms-auto align-items-lg-center">
-          <!-- Quick links (εμφανίζονται σε desktop, και μέσα στο μενού σε mobile) -->
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Home</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery') }}">Gallery</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('captions') }}">Captions</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('logs') }}">Logs</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('backup') }}">Backup (ZIP)</a></li>
+    <div class="collapse navbar-collapse" id="topnav">
+      <!-- Left: pinned (συχνά) -->
+      <ul class="navbar-nav me-auto">
+        {% for item in nav_pinned %}
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == item.endpoint %}active{% endif %}"
+             href="{{ url_for(item.endpoint) }}">{{ item.label }}</a>
+        </li>
+        {% endfor %}
+      </ul>
 
-          <!-- Divider (μόνο οπτικά) -->
-          <li class="nav-item d-none d-lg-block">
-            <span class="mx-2" style="opacity:.4">|</span>
-          </li>
+      <!-- Right: Theme + More -->
+      <ul class="navbar-nav ms-auto align-items-lg-center">
 
-          <!-- Dropdown: Menu (περιλαμβάνει και το Theme) -->
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle btn btn-sm btn-outline-secondary px-3"
-               href="#" id="menuDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              Menu
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="menuDropdown">
-              <li><a class="dropdown-item" href="{{ url_for('index') }}">Home</a></li>
-              <li><a class="dropdown-item" href="{{ url_for('gallery') }}">Gallery</a></li>
-              <li><a class="dropdown-item" href="{{ url_for('captions') }}">Captions</a></li>
-              <li><a class="dropdown-item" href="{{ url_for('logs') }}">Logs</a></li>
-              <li><a class="dropdown-item" href="{{ url_for('backup') }}">Backup (ZIP)</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <li class="px-3 py-2 text-muted small">Theme</li>
-              <li><a class="dropdown-item theme-option" data-theme="auto"  href="#">Auto (System)</a></li>
-              <li><a class="dropdown-item theme-option" data-theme="light" href="#">Light</a></li>
-              <li><a class="dropdown-item theme-option" data-theme="dark"  href="#">Dark</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <li class="px-3">
-                <span id="themeBadge" class="badge bg-secondary">Theme: Auto</span>
-              </li>
-            </ul>
-          </li>
-        </ul>
-      </div>
-    </nav>
+        <!-- Theme dropdown -->
+        <li class="nav-item dropdown me-2">
+          <a class="nav-link dropdown-toggle" href="#" id="themeDropdown" role="button"
+             data-bs-toggle="dropdown" aria-expanded="false">
+            Theme
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="themeDropdown">
+            <li><a class="dropdown-item theme-option" href="#" data-theme="auto">Auto</a></li>
+            <li><a class="dropdown-item theme-option" href="#" data-theme="light">Light</a></li>
+            <li><a class="dropdown-item theme-option" href="#" data-theme="dark">Dark</a></li>
+          </ul>
+        </li>
+
+        <!-- More dropdown -->
+        {% if nav_more %}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle btn btn-sm btn-outline-secondary px-3"
+             href="#" id="moreDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            More
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="moreDropdown">
+            {% for item in nav_more %}
+            <li>
+              <a class="dropdown-item {% if request.endpoint == item.endpoint %}active{% endif %}"
+                 href="{{ url_for(item.endpoint) }}">{{ item.label }}</a>
+            </li>
+            {% endfor %}
+          </ul>
+        </li>
+        {% endif %}
+
+      </ul>
+    </div>
+  </div>
+</nav>
+
+
   </header>
 
   <main>

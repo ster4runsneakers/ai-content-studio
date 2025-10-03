@@ -1,3 +1,141 @@
+# ==== CAPTIONS SUPPORT (do not edit) ====
+import os
+from typing import List, Dict
+
+# Πολύ χοντρική ανίχνευση αν το θέμα είναι τρόφιμο/ποτό
+FOOD_MARKERS = ["φαγη", "γεύσ", "γευση", "σνακ", "ποτό", "ποτα", "καφέ", "κουζί", "μπουκιά", "συνταγ", "πιάτ"]
+BAN_WORDS = ["γεύση","γεύσεις","ουρανίσκο","μπουκιά","γαστρονομ","νόστιμο","λαχταρισ","μαγειρ",
+             "συνταγ","πιάτο","κουζίνα","φαγητ","ποτό","ποτά"]
+
+PLATFORM_RULES = {
+    "TikTok": "Very short, punchy; youth vibe; 1 short line each.",
+    "Instagram": "Short, aspirational; can include product/brand; 1 line each.",
+    "Facebook": "Short and clear; friendly; 1 line each.",
+    "YouTube Shorts": "Hook-friendly; energetic; 1 line each.",
+    "Pinterest": "Inspirational, descriptive; 1 line each."
+}
+
+def _lang_label(lang: str) -> str:
+    return "Greek" if (lang or "el").lower().startswith("el") else "English"
+
+def _mode_instructions(mode: str, lang: str) -> str:
+    if mode == "hooks":
+        return "Write only HOOKS: ultra-short attention grabbers that make users want to read/watch."
+    if mode == "ctas":
+        return "Write only CALLS TO ACTION: direct, compelling prompts to act (buy, click, follow, learn more)."
+    return "Write only CAPTIONS: short social-ready lines that fit the platform."
+
+def generate_social_lines(topic: str, tone: str, n: int,
+                          platform: str, mode: str, lang: str, keywords: str = "",
+                          use_emojis: bool = False, use_hashtags: bool = False) -> List[str]:
+    """
+    Παράγει n γραμμές για συγκεκριμένο platform/mode/lang με επιλογές emojis/hashtags.
+    Παίζει με νέο ή παλιό OpenAI SDK. Επιστρέφει καθαρές γραμμές (χωρίς bullets/αρίθμηση).
+    """
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("Λείπει το OPENAI_API_KEY (βάλε το στο .env ή στο Render → Environment).")
+
+    is_food = any(m in (topic or "").lower() for m in FOOD_MARKERS)
+    lang_label = _lang_label(lang)
+    platform_rules = PLATFORM_RULES.get(platform, PLATFORM_RULES["Instagram"])
+    mode_rules = _mode_instructions(mode, lang)
+
+    # Φρουρός για άσχετο λεξιλόγιο (φαγητό) όταν δεν είναι το θέμα
+    guard = ""
+    if not is_food:
+        guard = ("The topic is NOT about food or drinks. STRICTLY FORBIDDEN vocabulary related to food/taste: "
+                 + ", ".join(BAN_WORDS) + ".")
+
+    kw_note = ""
+    if (keywords or "").strip():
+        kw_note = f"Include naturally these keywords or ideas: {keywords}."
+
+    # Emojis / Hashtags κανόνες
+    if use_emojis:
+        emoji_rule = "You MAY use at most 1 emoji per line (optional)."
+    else:
+        emoji_rule = "Do NOT use any emojis."
+
+    if use_hashtags:
+        # Γενικός κανόνας + ειδική χαλάρωση ανά πλατφόρμα
+        if platform in ("Instagram", "TikTok", "YouTube Shorts", "Pinterest"):
+            hashtag_rule = "Add 2-4 relevant hashtags at the END of each line (no spaces in tags)."
+        elif platform == "Facebook":
+            hashtag_rule = "Optionally add up to 2 relevant hashtags at the END of each line."
+        else:
+            hashtag_rule = "Add 2-4 relevant hashtags at the END of each line."
+    else:
+        hashtag_rule = "Do NOT include any hashtags."
+
+    system = (
+        "You are a senior social-media copywriter. "
+        "Return EXACTLY one line per item, no numbering, no bullets. "
+        "Stay strictly on topic; be vivid and concrete. "
+        "Avoid generic fluff."
+    )
+
+    user = (
+        f"Language: {lang_label}. Platform: {platform}. Tone: {tone}. "
+        f"Topic/product: {topic}. {kw_note} {guard} {platform_rules} {mode_rules} "
+        f"{emoji_rule} {hashtag_rule} "
+        f"Generate {n} different lines. Output: one line per line, no extra text."
+    )
+
+    # --- ΝΕΟ SDK (openai>=1.x) ---
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=key)
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.8,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user",   "content": user}],
+        )
+        text = (resp.choices[0].message.content or "").strip()
+    except Exception as e_new:
+        # --- ΠΑΛΙΟ SDK (openai==0.28.x) ---
+        try:
+            import openai as openai_legacy
+            openai_legacy.api_key = key
+            resp = openai_legacy.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                temperature=0.8,
+                messages=[{"role": "system", "content": system},
+                          {"role": "user",   "content": user}],
+            )
+            text = (resp["choices"][0]["message"]["content"] or "").strip()
+        except Exception as e_old:
+            raise RuntimeError(f"OpenAI captions error (new='{e_new}', legacy='{e_old}')")
+
+    # Καθάρισμα: σπάσε σε γραμμές και αφαίρεσε bullets/αρίθμηση
+    lines = [ln.strip().lstrip("•-").lstrip("0123456789. ").strip() for ln in (text.splitlines() or [])]
+    lines = [ln for ln in lines if ln]
+    return lines[:max(1, n)]
+
+def generate_social_bundle(topic: str, tone: str, n: int,
+                           platform: str, mode: str, lang: str, keywords: str = "",
+                           use_emojis: bool = False, use_hashtags: bool = False) -> Dict[str, List[str]]:
+    """
+    Αν mode == 'all' παράγει τρεις λίστες (hooks, captions, ctas) μοιράζοντας το n.
+    Αλλιώς παράγει μόνο τη ζητούμενη λίστα.
+    """
+    if mode != "all":
+        return { mode: generate_social_lines(topic, tone, n, platform, mode, lang, keywords,
+                                             use_emojis, use_hashtags) }
+
+    # Μοίρασμα n σε 3 κατηγορίες (τουλάχιστον 1 σε κάθε)
+    h = max(1, n // 3)
+    c = max(1, (n - h) // 2)
+    a = max(1, n - h - c)
+    return {
+        "hooks":    generate_social_lines(topic, tone, h, platform, "hooks",    lang, keywords, use_emojis, use_hashtags),
+        "captions": generate_social_lines(topic, tone, c, platform, "captions", lang, keywords, use_emojis, use_hashtags),
+        "ctas":     generate_social_lines(topic, tone, a, platform, "ctas",     lang, keywords, use_emojis, use_hashtags),
+    }
+# ==== /CAPTIONS SUPPORT ====
+
+
 import os, io, base64, json, time, requests, shutil, tempfile
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file, abort
@@ -166,6 +304,8 @@ def append_log(entry: dict):
     entry["logged_at"] = datetime.now().isoformat()
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
 
 # ── ROUTES ──────────────────────────────────────
 @app.route("/", methods=["GET", "POST"])
@@ -373,6 +513,56 @@ def backup():
 @app.route("/health")
 def health():
     return "ok", 200
+
+# ==== /captions route (platform/kind/lang/keywords + emojis/hashtags) ====
+from flask import request, render_template
+
+@app.route("/captions", methods=["GET","POST"])
+def captions():
+    error = None
+    topic = ""
+    tone = "neutral"
+    n = 6
+    platform = "Instagram"
+    kind = "captions"   # captions | hooks | ctas | all
+    lang = "el"         # el | en
+    keywords = ""
+    emojis = False
+    hashtags = False
+
+    results = {}
+
+    if request.method == "POST":
+        topic = (request.form.get("topic") or "").strip()
+        tone = (request.form.get("tone") or "neutral").strip()
+        platform = (request.form.get("platform") or "Instagram").strip()
+        kind = (request.form.get("kind") or "captions").strip()
+        lang = (request.form.get("lang") or "el").strip()
+        keywords = (request.form.get("keywords") or "").strip()
+        emojis = bool(request.form.get("emojis"))
+        hashtags = bool(request.form.get("hashtags"))
+        try:
+            n = int(request.form.get("n") or 6)
+        except:
+            n = 6
+
+        try:
+            if not topic:
+                raise RuntimeError("Γράψε θέμα/προϊόν.")
+            results = generate_social_bundle(topic, tone, n, platform, kind, lang, keywords,
+                                             use_emojis=emojis, use_hashtags=hashtags)
+        except Exception as e:
+            error = str(e)
+
+    return render_template("captions.html",
+                           error=error,
+                           topic=topic, tone=tone, n=n,
+                           platform=platform, kind=kind, lang=lang, keywords=keywords,
+                           emojis=emojis, hashtags=hashtags,
+                           results=results)
+# ==== /end captions route ====
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)

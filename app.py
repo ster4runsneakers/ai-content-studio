@@ -138,13 +138,66 @@ def generate_social_bundle(topic: str, tone: str, n: int,
 
 import os, io, base64, json, time, requests, shutil, tempfile
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, send_file, abort
-from dotenv import load_dotenv
+from flask import Flask, render_template, request, redirect, url_for, send_file, abort, current_app
+from dotenv import load_dotenv, find_dotenv
+dotenv_path = find_dotenv(usecwd=True)
+load_dotenv(dotenv_path=dotenv_path, override=True)
+
+print("DOTENV used from:", dotenv_path or "NOT FOUND")
+
 from PIL import Image, ImageDraw, ImageFont
 from openai import OpenAI
 
 # ── ENV ─────────────────────────────────────────
-load_dotenv()
+# === Robust .env loader (fix για κρυφούς χαρακτήρες, σχόλια, ελληνικά κλπ.) ===
+import os, re
+from dotenv import load_dotenv, find_dotenv
+
+def _mask(s): 
+    return (s[:4] + "…" + s[-4:]) if s and len(s) > 8 else ("EMPTY" if not s else "SHORT")
+
+def _force_env_from_file(path: str):
+    """Διαβάζει το .env 'με το χέρι' και καθαρίζει key names από μη ASCII/space/zero-width."""
+    if not path or not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8-sig") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            # καθάρισε το key από περίεργα:
+            k = k.strip()
+            # κράτα μόνο A-Z a-z 0-9 και underscore
+            k = "".join(ch for ch in k if (ch == "_" or ch.isascii() and ch.isalnum()))
+            k = k.upper()
+            v = v.strip().strip('"').strip("'")
+            if k in {"OPENAI_API_KEY","CLOUDINARY_URL","CLOUDINARY_FOLDER","GOOGLE_CSE_KEY","GOOGLE_CSE_ID"}:
+                os.environ[k] = v
+
+# φορτώνουμε πρώτα κανονικά
+dotenv_path = find_dotenv(usecwd=True)
+load_dotenv(dotenv_path=dotenv_path, override=True)
+# και μετά κάνουμε force clean για τις «δύσκολες» γραμμές
+_force_env_from_file(dotenv_path)
+print("DOTENV used from:", dotenv_path or "NOT FOUND")
+
+# αν έχεις Flask app, βάλε (ή άσε) αυτά ΜΕΤΑ την δημιουργία του app:
+# app.config["GOOGLE_CSE_KEY"] = os.getenv("GOOGLE_CSE_KEY") or ""
+# app.config["GOOGLE_CSE_ID"]  = os.getenv("GOOGLE_CSE_ID") or ""
+# print("CSE DEBUG key=", _mask(app.config["GOOGLE_CSE_KEY"]), "cx=", app.config["GOOGLE_CSE_ID"] or "EMPTY")
+# === /Robust .env loader ===
+
+
+# αποθήκευσέ τα και στο app.config για σιγουριά
+app = Flask(__name__)  # αν δεν έχεις ήδη αυτή τη γραμμή, βάλε την όπως την έχεις
+app.config["GOOGLE_CSE_KEY"] = os.getenv("GOOGLE_CSE_KEY") or ""
+app.config["GOOGLE_CSE_ID"]  = os.getenv("GOOGLE_CSE_ID") or ""
+
+# προαιρετικό debug print (μάσκα)
+def _mask(s): return (s[:4]+"…"+s[-4:]) if s and len(s)>8 else ("EMPTY" if not s else "SHORT")
+print("CSE DEBUG key=", _mask(app.config["GOOGLE_CSE_KEY"]), "cx=", app.config["GOOGLE_CSE_ID"] or "EMPTY")
+
 OPENAI_KEY = os.getenv("OPENAI_API_KEY") or ""
 print("DEBUG OPENAI:", (OPENAI_KEY[:8] + "...") if OPENAI_KEY else "MISSING")
 client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
@@ -166,21 +219,45 @@ def log(*args):
 
 # ── FLASK ───────────────────────────────────────
 app = Flask(__name__)
-# ===== NAV CONFIG (pinned + more) =====
-from flask import current_app
 
-NAV_ITEMS = [
-    {"label": "Home",          "candidates": ["index"],                         "pinned": True},
-    {"label": "Gallery",       "candidates": ["gallery"],                       "pinned": True},
-    {"label": "Captions",      "candidates": ["captions"],                      "pinned": True},
+# ── OPTIONAL BLUEPRINTS (δεν σκάει αν λείπουν) ──
+try:
+    from routes_media import media_bp     # παρέχει /upload, /cse
+    app.register_blueprint(media_bp)
+    print("Blueprint: media ✅")
+except Exception as e:
+    print("Blueprint: media ❌", e)
 
-    {"label": "Upload",        "candidates": ["upload"],                        "pinned": False},
-    {"label": "CSE",           "candidates": ["cse"],                           "pinned": False},
-    {"label": "A/B Tests",     "candidates": ["ab.index"],                      "pinned": False},
-    {"label": "A/B Captions",  "candidates": ["ab.create_test"],                "pinned": False},
-    {"label": "Logs",          "candidates": ["logs"],                          "pinned": False},
-    {"label": "Backup (ZIP)",  "candidates": ["backup"],                        "pinned": False},
+try:
+    from routes_ab import ab_bp           # A/B tests
+    app.register_blueprint(ab_bp)
+    print("Blueprint: ab ✅")
+except Exception as e:
+    print("Blueprint: ab ❌", e)
+
+try:
+    from routes_snippets import snip_bp   # My Snippets
+    app.register_blueprint(snip_bp)
+    print("Blueprint: snippets ✅")
+except Exception as e:
+    print("Blueprint: snippets ❌", e)
+
+# ===== NAV CONFIG (COMPACT: λίγα tabs, όλα τα άλλα στο More) =====
+NAV_CATALOG = [
+    # — Πάνω στη μπάρα (pinned=True) —
+    {"label": "Home",     "candidates": ["index"],        "pinned": True},
+    {"label": "Captions", "candidates": ["captions"],     "pinned": True},
+    {"label": "Gallery",      "candidates": ["gallery"],  "pinned": True},
+    
+    # — Στο dropdown (pinned=False) —
+    {"label": "Upload",       "candidates": ["media.upload","upload"], "pinned": False},
+    {"label": "CSE",          "candidates": ["media.cse","cse"],       "pinned": False},
+    {"label": "My Snippets",  "candidates": ["snip.index","snippets"], "pinned": False},
+    {"label": "A/B Tests",    "candidates": ["ab.index"],              "pinned": False},
+    {"label": "Logs",         "candidates": ["logs"],                  "pinned": False},
+    {"label": "Backup (ZIP)", "candidates": ["backup"],                "pinned": False},
 ]
+# ===== /NAV CONFIG =====
 
 def _resolve_endpoint(candidates):
     for ep in candidates:
@@ -191,7 +268,7 @@ def _resolve_endpoint(candidates):
 @app.context_processor
 def inject_nav():
     resolved = []
-    for it in NAV_ITEMS:
+    for it in NAV_CATALOG:
         ep = _resolve_endpoint(it["candidates"])
         if ep:
             resolved.append({"label": it["label"], "endpoint": ep, "pinned": it.get("pinned", False)})
@@ -338,7 +415,6 @@ def append_log(entry: dict):
     entry["logged_at"] = datetime.now().isoformat()
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
 
 
 # ── ROUTES ──────────────────────────────────────
@@ -548,9 +624,12 @@ def backup():
 def health():
     return "ok", 200
 
-# ==== /captions route (platform/kind/lang/keywords + emojis/hashtags) ====
-from flask import request, render_template
+@app.route("/__endpoints")
+def __endpoints():
+    return "<pre>" + "\n".join(sorted(app.view_functions.keys())) + "</pre>"
 
+
+# ==== /captions route (platform/kind/lang/keywords + emojis/hashtags) ====
 @app.route("/captions", methods=["GET","POST"])
 def captions():
     error = None
@@ -595,7 +674,6 @@ def captions():
                            emojis=emojis, hashtags=hashtags,
                            results=results)
 # ==== /end captions route ====
-
 
 
 if __name__ == "__main__":

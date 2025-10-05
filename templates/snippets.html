@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}My Snippets{% endblock %}
+{% block content %}
+
+<div class="container py-4">
+  <div class="d-flex align-items-center mb-3">
+    <h3 class="mb-0">My Snippets</h3>
+    <span class="badge bg-secondary ms-2">{{ rows|length }}</span>
+    <div class="ms-auto">
+      <a class="btn btn-sm btn-outline-primary me-2"
+         href="{{ url_for('snip.export_csv', q=q, tag=tag, kind=kind) }}">Export CSV</a>
+      <a class="btn btn-sm btn-outline-primary me-2"
+         href="{{ url_for('snip.export_txt', q=q, tag=tag, kind=kind) }}">Export TXT</a>
+      <a class="btn btn-sm btn-outline-danger"
+         href="{{ url_for('snip.backup_db') }}">Backup DB</a>
+    </div>
+  </div>
+
+  <form class="row g-2 mb-3" method="get" action="{{ url_for('snip.index') }}">
+    <div class="col-12 col-md-4">
+      <input class="form-control" type="search" name="q" placeholder="Search text/tags…" value="{{ q }}">
+    </div>
+    <div class="col-6 col-md-3">
+      <input class="form-control" type="text" name="tag" placeholder="Filter by tag (exact)" value="{{ tag }}">
+    </div>
+    <div class="col-6 col-md-3">
+      <select class="form-select" name="kind">
+        <option value="">All kinds</option>
+        {% for k in ["caption","hook","cta","mixed"] %}
+          <option value="{{k}}" {% if kind==k %}selected{% endif %}>{{k|capitalize}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-2 d-grid">
+      <button class="btn btn-dark" type="submit">Filter</button>
+    </div>
+  </form>
+
+  {% if rows|length == 0 %}
+    <div class="alert alert-secondary">No snippets yet. Αποθήκευσε από τα Captions σου, ή βάλε χειροκίνητα με API.</div>
+  {% else %}
+  <div class="table-responsive">
+    <table class="table align-middle table-hover">
+      <thead class="table-light">
+        <tr>
+          <th style="width:80px;">ID</th>
+          <th style="width:160px;">Meta</th>
+          <th>Text</th>
+          <th style="width:200px;">Tags</th>
+          <th style="width:160px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr id="row-{{r.id}}">
+          <td>#{{ r.id }}<br><small class="text-muted">{{ r.created_at }}</small></td>
+          <td>
+            <div><small>Platform:</small> <span class="fw-semibold">{{ r.platform or "-" }}</span></div>
+            <div><small>Lang:</small> <span class="fw-semibold">{{ r.lang or "-" }}</span></div>
+            <div><small>Kind:</small> <span class="fw-semibold">{{ r.kind or "-" }}</span></div>
+          </td>
+          <td>
+            <textarea class="form-control" rows="3" id="text-{{r.id}}">{{ r.text }}</textarea>
+          </td>
+          <td>
+            <input class="form-control" id="tags-{{r.id}}" value="{{ r.tags }}">
+            <div class="form-text">comma,separated</div>
+          </td>
+          <td>
+            <div class="d-grid gap-2">
+              <button class="btn btn-sm btn-outline-success" onclick="saveRow({{r.id}})">Save</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="delRow({{r.id}})">Delete</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+async function saveRow(id){
+  const text = document.getElementById('text-'+id).value.trim();
+  const tags = document.getElementById('tags-'+id).value.trim();
+  if(!text){ alert('Empty text'); return; }
+  const fd = new FormData();
+  fd.append('id', id);
+  fd.append('text', text);
+  fd.append('tags', tags);
+  const res = await fetch('{{ url_for("snip.update") }}', {method:'POST', body: fd});
+  const j = await res.json();
+  if(j.ok){ toast('Saved #'+id); } else { alert(j.error||'Error'); }
+}
+async function delRow(id){
+  if(!confirm('Delete snippet #'+id+' ?')) return;
+  const fd = new FormData();
+  fd.append('id', id);
+  const res = await fetch('{{ url_for("snip.delete") }}', {method:'POST', body: fd});
+  const j = await res.json();
+  if(j.ok){
+    const tr = document.getElementById('row-'+id);
+    if(tr) tr.remove();
+  } else { alert(j.error||'Error'); }
+}
+function toast(msg){
+  // απλό placeholder—αν έχεις ήδη alert/toast lib, χρησιμοποίησέ την
+  console.log(msg);
+}
+</script>
+
+{% endblock %}

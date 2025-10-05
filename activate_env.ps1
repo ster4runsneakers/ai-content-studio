@@ -1,9 +1,10 @@
-# activate_env.ps1
-Write-Host "🔹 Activating virtual environment..."
-$venvPath = ".\.venv\Scripts\Activate.ps1"
-
-if (Test-Path $venvPath) {
-    & $venvPath
-    Write-Host "✅ Virtual environment activated!"
-} else {
-    Write-Host "❌ Δεν βρέθηκε το .venv. Δημιούργησέ το πρώτα με: python -m venv .venv"
+$ErrorActionPreference = "Stop"
+cd $PSScriptRoot
+if (!(Test-Path .\.venv\Scripts\Activate.ps1)) {
+  python -m venv .venv
+}
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip wheel
+if (Test-Path .\requirements.txt) { pip install -r requirements.txt }
+Write-Host "Venv ready. You can now run: python app.py"

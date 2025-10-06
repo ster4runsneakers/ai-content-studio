@@ -29,7 +29,7 @@ $items = Get-ChildItem -Recurse -File | Where-Object {
   $_.Extension -notin @(".pyc", ".pyo", ".zip")
 }
 if (-not $IncludeEnv) {
-  $items = $items | Where-Object { $_.Name -ne ".env" }
+  $items = $items | Where-Object { $_.Name -notlike ".env*" }
 }
 if ($items.Count -gt 0) {
   Compress-Archive -Path ($items | ForEach-Object { $_.FullName }) -DestinationPath $zipPath -Force

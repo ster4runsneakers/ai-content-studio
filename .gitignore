@@ -18,3 +18,9 @@ data/*
 .env*
 
 .env*
+
+.env*
+.venv/
+__pycache__/
+_backups/
+*.zip

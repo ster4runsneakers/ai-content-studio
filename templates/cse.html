@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-3">Google CSE (εικόνες)</h2>
+
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" class="card shadow-sm mb-4">
+    <div class="card-body row g-3">
+      <div class="col-12 col-lg-6">
+        <label class="form-label">Αναζήτηση</label>
+        <input type="text" name="q" value="{{ q or '' }}" class="form-control" placeholder="π.χ. sneakers summer">
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label">Aspect</label>
+        <select name="aspect" class="form-select">
+          <option value="any" {{ 'selected' if aspect=='any' else '' }}>Any</option>
+          {% for a in aspects %}
+          <option value="{{ a }}" {{ 'selected' if a==aspect else '' }}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label">Type</label>
+        <select name="img_type" class="form-select">
+          <option value="" {{ 'selected' if img_type=='' else '' }}>Any</option>
+          <option value="photo" {{ 'selected' if img_type=='photo' else '' }}>Photo</option>
+          <option value="clipart" {{ 'selected' if img_type=='clipart' else '' }}>Clipart</option>
+          <option value="lineart" {{ 'selected' if img_type=='lineart' else '' }}>Lineart</option>
+          <option value="face" {{ 'selected' if img_type=='face' else '' }}>Face</option>
+        </select>
+      </div>
+      <div class="col-6 col-lg-1">
+        <label class="form-label">Size</label>
+        <select name="img_size" class="form-select">
+          <option value="" {{ 'selected' if img_size=='' else '' }}>Any</option>
+          <option value="medium" {{ 'selected' if img_size=='medium' else '' }}>Medium</option>
+          <option value="xlarge" {{ 'selected' if img_size=='xlarge' else '' }}>XLarge</option>
+          <option value="huge" {{ 'selected' if img_size=='huge' else '' }}>Huge</option>
+        </select>
+      </div>
+      <div class="col-6 col-lg-1">
+        <label class="form-label">Safe</label>
+        <select name="safe" class="form-select">
+          <option value="off" {{ 'selected' if safe=='off' else '' }}>Off</option>
+          <option value="medium" {{ 'selected' if safe=='medium' else '' }}>Medium</option>
+          <option value="high" {{ 'selected' if safe=='high' else '' }}>High</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-12">
+        <button class="btn btn-primary">Search</button>
+      </div>
+    </div>
+  </form>
+
+  {% if results and results|length %}
+  <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+    {% for it in results %}
+    <div class="col">
+      <div class="card h-100 shadow-sm">
+        <img src="{{ it.thumbnail or it.link }}" class="card-img-top" alt="{{ it.title|default('img') }}">
+        <div class="card-body">
+          <div class="small text-muted mb-2">{{ it.width }}×{{ it.height }}</div>
+          <div class="text-truncate" title="{{ it.title }}">{{ it.title }}</div>
+        </div>
+        <div class="card-footer bg-white">
+          <form method="POST" action="{{ url_for('media.import') }}" class="d-grid gap-2">
+            <input type="hidden" name="src" value="{{ it.link }}">
+            <input type="hidden" name="aspect" value="{{ aspect if aspect!='any' else '1:1' }}">
+            <input type="hidden" name="wm_style" value="soft">
+            <input type="hidden" name="quality" value="92">
+            <button class="btn btn-outline-primary btn-sm">Send to Upload</button>
+          </form>
+          <a href="{{ it.link }}" target="_blank" class="btn btn-link btn-sm">Open original</a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% elif q %}
+  <div class="alert alert-warning">Δεν βρέθηκαν αποτελέσματα.</div>
+  {% endif %}
+</div>
+{% endblock %}

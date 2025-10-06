@@ -1,0 +1,8 @@
+﻿flask
+python-dotenv
+pillow
+openai
+cloudinary
+gunicorn
+requests
+

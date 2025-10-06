@@ -14,13 +14,3 @@ static/outputs/*
 # local logs/data (κρατάμε μόνο .gitkeep)
 data/*
 !data/.gitkeep
-
-.env*
-
-.env*
-
-.env*
-.venv/
-__pycache__/
-_backups/
-*.zip

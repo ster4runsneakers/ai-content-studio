@@ -1,330 +1,199 @@
 {% extends "base.html" %}
-{% block title %}Captions{% endblock %}
-
 {% block content %}
-<div class="container py-4" id="captions-root"
-     data-platform="{{ platform or 'Instagram' }}"
-     data-kind="{{ kind or 'captions' }}"
-     data-lang="{{ lang or 'el' }}"
-     data-tone="{{ tone or 'neutral' }}"
-     data-n="{{ n or 6 }}"
-     data-topic="{{ topic or '' }}"
-     data-keywords="{{ keywords or '' }}"
-     data-emojis="{{ '1' if emojis else '0' }}"
-     data-hashtags="{{ '1' if hashtags else '0' }}"
->
-  <!-- Presets -->
-  <div class="card p-3 mb-3">
-    <div class="d-flex flex-wrap justify-content-between align-items-center">
-      <h2 class="h5 mb-2 mb-sm-0">Presets</h2>
-      <div class="d-flex gap-2">
-        <input class="form-control form-control-sm" type="text" id="presetName" placeholder="Preset name">
-        <button class="btn btn-sm btn-outline-primary" type="button" onclick="savePreset()">Save</button>
-        <select id="presetSelect" class="form-select form-select-sm" style="min-width:180px"></select>
-        <button class="btn btn-sm btn-outline-secondary" type="button" onclick="applyPreset()">Load</button>
-        <button class="btn btn-sm btn-outline-danger" type="button" onclick="deletePreset()">Delete</button>
-        <button class="btn btn-sm btn-outline-dark" type="button" onclick="clearForm()">Clear form</button>
+<div class="container py-4">
+  <h2 class="mb-3">AI Captions (Hooks / Captions / CTAs / Hashtags)</h2>
+
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" class="card shadow-sm mb-4">
+    <div class="card-body row g-3">
+      <div class="col-12 col-lg-6">
+        <label class="form-label">Θέμα / Προϊόν</label>
+        <input name="topic" class="form-control" value="{{ topic or '' }}" placeholder="π.χ. sneakers summer sale">
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <label class="form-label">Πλατφόρμα</label>
+        <select name="platform" class="form-select">
+          {% set platforms = ['Instagram','TikTok','Facebook','Pinterest'] %}
+          {% for p in platforms %}
+          <option value="{{ p }}" {{ 'selected' if platform==p else '' }}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <label class="form-label">Γλώσσα</label>
+        <select name="lang" class="form-select">
+          <option value="el" {{ 'selected' if lang=='el' else '' }}>Ελληνικά</option>
+          <option value="en" {{ 'selected' if lang=='en' else '' }}>English</option>
+        </select>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <label class="form-label">Τόνος</label>
+        <select name="tone" class="form-select">
+          {% for t in ['energetic','friendly','luxury','minimal','funny','edgy'] %}
+          <option value="{{ t }}" {{ 'selected' if tone==t else '' }}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-lg-2">
+        <label class="form-label">Πόσα</label>
+        <input type="number" min="3" max="20" step="1" name="n" value="{{ n or 6 }}" class="form-control">
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <label class="form-label">Kind</label>
+        <select name="kind" class="form-select">
+          {% set kinds = ['all','hooks','captions','ctas','hashtags'] %}
+          {% for k in kinds %}
+          <option value="{{ k }}" {{ 'selected' if kind==k else '' }}>{{ k|capitalize }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">All = εμφάνιση όλων. Τα άλλα φιλτράρουν.</div>
+      </div>
+
+      <div class="col-12 col-lg-7">
+        <label class="form-label">Keywords</label>
+        <input name="keywords" class="form-control" value="{{ keywords or '' }}" placeholder="π.χ. retro, limited, sale">
+      </div>
+
+      <div class="col-6 col-lg-2 form-check ms-3 mt-4">
+        <input class="form-check-input" type="checkbox" name="emojis" id="emojis" {{ 'checked' if emojis else '' }}>
+        <label class="form-check-label" for="emojis">Emojis</label>
+      </div>
+
+      <div class="col-6 col-lg-2 form-check mt-4">
+        <input class="form-check-input" type="checkbox" name="hashtags" id="hashtags" {{ 'checked' if hashtags else '' }}>
+        <label class="form-check-label" for="hashtags">Hashtags</label>
+      </div>
+
+      <div class="col-12">
+        <button class="btn btn-primary">Generate</button>
       </div>
     </div>
-  </div>
-
-  <!-- Form -->
-  <div class="card p-3">
-    <h1 class="h4 mb-3">Generate Captions / Hooks / CTAs</h1>
-    {% if error %}<p class="mb-3 text-danger">{{ error }}</p>{% endif %}
-
-    <form method="post" class="row g-3" id="cfgForm">
-      <div class="col-12">
-        <label class="form-label">Θέμα/Προϊόν</label>
-        <input class="form-control" type="text" name="topic" id="topic"
-               value="{{ topic or '' }}"
-               placeholder="π.χ. Saucony Triumph 22 running sneakers">
-      </div>
-
-      <div class="col-12">
-        <label class="form-label">Keywords (προαιρετικά)</label>
-        <input class="form-control" type="text" name="keywords" id="keywords"
-               value="{{ keywords or '' }}"
-               placeholder="π.χ. running, cushioning, lightweight, Saucony">
-      </div>
-
-      <div class="col-6 col-md-4">
-        <label class="form-label">Platform</label>
-        {% set p = platform or 'Instagram' %}
-        <select class="form-select" name="platform" id="platform">
-          <option {{ 'selected' if p=='TikTok' else '' }}>TikTok</option>
-          <option {{ 'selected' if p=='Instagram' else '' }}>Instagram</option>
-          <option {{ 'selected' if p=='Facebook' else '' }}>Facebook</option>
-          <option {{ 'selected' if p=='YouTube Shorts' else '' }}>YouTube Shorts</option>
-          <option {{ 'selected' if p=='Pinterest' else '' }}>Pinterest</option>
-        </select>
-      </div>
-
-      <div class="col-6 col-md-4">
-        <label class="form-label">Type</label>
-        {% set k = kind or 'captions' %}
-        <select class="form-select" name="kind" id="kind">
-          <option value="captions" {{ 'selected' if k=='captions' else '' }}>Captions</option>
-          <option value="hooks"    {{ 'selected' if k=='hooks' else '' }}>Hooks</option>
-          <option value="ctas"     {{ 'selected' if k=='ctas' else '' }}>CTAs</option>
-          <option value="all"      {{ 'selected' if k=='all' else '' }}>All (3 lists)</option>
-        </select>
-      </div>
-
-      <div class="col-6 col-md-2">
-        <label class="form-label">Language</label>
-        {% set l = (lang or 'el') %}
-        <select class="form-select" name="lang" id="lang">
-          <option value="el" {{ 'selected' if l=='el' else '' }}>Ελληνικά</option>
-          <option value="en" {{ 'selected' if l=='en' else '' }}>English</option>
-        </select>
-      </div>
-
-      <div class="col-6 col-md-2">
-        <label class="form-label">Tone</label>
-        {% set t = (tone or 'neutral') %}
-        <select class="form-select" name="tone" id="tone">
-          <option value="neutral"   {{ 'selected' if t=='neutral' else '' }}>Neutral</option>
-          <option value="energetic" {{ 'selected' if t=='energetic' else '' }}>Energetic</option>
-          <option value="luxury"    {{ 'selected' if t=='luxury' else '' }}>Luxury</option>
-          <option value="playful"   {{ 'selected' if t=='playful' else '' }}>Playful</option>
-          <option value="urgent"    {{ 'selected' if t=='urgent' else '' }}>Urgent</option>
-        </select>
-      </div>
-
-      <div class="col-6 col-md-2">
-        <label class="form-label">Πλήθος</label>
-        <input class="form-control" type="number" name="n" id="n" min="3" max="15" step="1" value="{{ n or 6 }}">
-      </div>
-
-      <div class="col-6 col-md-3 form-check ms-2">
-        <input class="form-check-input" type="checkbox" id="emojis" name="emojis" {% if emojis %}checked{% endif %}>
-        <label class="form-check-label" for="emojis">Include emojis</label>
-      </div>
-      <div class="col-6 col-md-3 form-check">
-        <input class="form-check-input" type="checkbox" id="hashtags" name="hashtags" {% if hashtags %}checked{% endif %}>
-        <label class="form-check-label" for="hashtags">Include hashtags</label>
-      </div>
-
-      <div class="col-12">
-        <button class="btn btn-primary" type="submit">Generate</button>
-      </div>
-    </form>
-  </div>
+  </form>
 
   {% if results %}
-    {% set groups = results %}
-    {% for key, title in {'hooks':'Hooks','captions':'Captions','ctas':'CTAs'}.items() %}
-      {% if groups.get(key) %}
-      <div class="card p-3 mt-3">
-        <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
-          <h3 class="h6 mb-0">{{ title }}</h3>
-          <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-secondary" type="button" onclick="copyAll('{{ key }}')">Copy all</button>
-            <div class="btn-group">
-              <button class="btn btn-sm btn-outline-success" type="button" onclick="downloadList('{{ key }}','csv')">Download CSV</button>
-              <button class="btn btn-sm btn-outline-success" type="button" onclick="downloadList('{{ key }}','txt')">Download TXT</button>
-            </div>
-          </div>
-        </div>
-        <ul class="list-group mt-2" id="list-{{ key }}">
-          {% for line in groups[key] %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <span class="me-3 text-wrap">{{ line }}</span>
-            <button class="btn btn-sm btn-outline-secondary" type="button"
-                    data-text="{{ line|e }}" onclick="copyOne(this)">Copy</button>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-      {% endif %}
-    {% endfor %}
+  <div class="row g-4">
 
-    <!-- Export ALL -->
-    <div class="card p-3 mt-3">
-      <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
-        <h3 class="h6 mb-0">Export all results</h3>
-        <div class="btn-group">
-          <button class="btn btn-sm btn-outline-success" type="button" onclick="downloadAll('csv')">Download ALL (CSV)</button>
-          <button class="btn btn-sm btn-outline-success" type="button" onclick="downloadAll('txt')">Download ALL (TXT)</button>
+    <!-- Hooks -->
+    <div class="col-12 col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span class="fw-bold">Hooks</span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyList('hooksList')">Copy all</button>
+        </div>
+        <div class="card-body">
+          {% if results.hooks and results.hooks|length %}
+          <ol id="hooksList" class="ps-3">
+            {% for ln in results.hooks %}
+            <li class="mb-2 d-flex align-items-start">
+              <span class="flex-grow-1 pe-2">{{ ln }}</span>
+              <button type="button" class="btn btn-sm btn-light" onclick="copyText(`{{ ln|replace('`','\\`') }}`)">Copy</button>
+            </li>
+            {% endfor %}
+          </ol>
+          {% else %}
+          <div class="text-muted">—</div>
+          {% endif %}
         </div>
       </div>
     </div>
+
+    <!-- Captions -->
+    <div class="col-12 col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span class="fw-bold">Captions</span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyList('capsList')">Copy all</button>
+        </div>
+        <div class="card-body">
+          {% if results.captions and results.captions|length %}
+          <ol id="capsList" class="ps-3">
+            {% for ln in results.captions %}
+            <li class="mb-2 d-flex align-items-start">
+              <span class="flex-grow-1 pe-2">{{ ln }}</span>
+              <button type="button" class="btn btn-sm btn-light" onclick="copyText(`{{ ln|replace('`','\\`') }}`)">Copy</button>
+            </li>
+            {% endfor %}
+          </ol>
+          {% else %}
+          <div class="text-muted">—</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- CTAs -->
+    <div class="col-12 col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span class="fw-bold">CTAs</span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyList('ctasList')">Copy all</button>
+        </div>
+        <div class="card-body">
+          {% if results.ctas and results.ctas|length %}
+          <ol id="ctasList" class="ps-3">
+            {% for ln in results.ctas %}
+            <li class="mb-2 d-flex align-items-start">
+              <span class="flex-grow-1 pe-2">{{ ln }}</span>
+              <button type="button" class="btn btn-sm btn-light" onclick="copyText(`{{ ln|replace('`','\\`') }}`)">Copy</button>
+            </li>
+            {% endfor %}
+          </ol>
+          {% else %}
+          <div class="text-muted">—</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Hashtags -->
+<div class="col-12">
+  <div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="fw-bold">Hashtags</span>
+      <div>
+        <button type="button" class="btn btn-sm btn-outline-secondary me-2"
+                onclick="copyHashtags('#hashtagsBox','line')">Copy (line)</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                onclick="copyHashtags('#hashtagsBox','grid')">Copy (one per line)</button>
+      </div>
+    </div>
+    <div class="card-body">
+      {% if results.hashtags and results.hashtags|length %}
+      <pre id="hashtagsBox" class="mb-0" style="white-space: pre-wrap;">{{ hashtags_line }}</pre>
+      {% else %}
+      <div class="text-muted">—</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+
+  </div>
   {% endif %}
 </div>
 
 <script>
-/* ====== COPY ====== */
-function copyOne(btn){
-  const t = btn.getAttribute('data-text') || '';
-  navigator.clipboard.writeText(t).then(()=>okToast('Copied!'));
+function copyText(t){navigator.clipboard.writeText(t).catch(()=>{});}
+function copyList(id){
+  const el=document.getElementById(id); if(!el) return;
+  const lines=[...el.querySelectorAll('li span:first-child')].map(s=>s.innerText.trim());
+  navigator.clipboard.writeText(lines.join('\n'));
 }
-function copyAll(key){
-  const lines = getLinesFromList(key);
-  if(!lines.length) return;
-  navigator.clipboard.writeText(lines.join('\n')).then(()=>okToast('Copied all!'));
+function copyHashtags(sel,mode){
+  const box=document.querySelector(sel); if(!box) return;
+  const raw=box.innerText.trim(); if(!raw) return;
+  if(mode==='grid'){
+    const parts=raw.split(/[\s]+/).filter(Boolean);
+    navigator.clipboard.writeText(parts.join('\n'));
+  } else { navigator.clipboard.writeText(raw); }
 }
-
-/* ====== EXPORT ====== */
-function getMeta(){
-  const root = document.getElementById('captions-root');
-  return {
-    platform: root.dataset.platform || 'Instagram',
-    kind:     root.dataset.kind || 'captions',
-    lang:     root.dataset.lang || 'el',
-    tone:     root.dataset.tone || 'neutral',
-    n:        root.dataset.n || '0',
-    topic:    root.dataset.topic || '',
-    keywords: root.dataset.keywords || '',
-    emojis:   root.dataset.emojis === '1',
-    hashtags: root.dataset.hashtags === '1',
-  };
-}
-function getLinesFromList(key){
-  const ul = document.getElementById('list-'+key);
-  if(!ul) return [];
-  return Array.from(ul.querySelectorAll('li span')).map(s=>s.textContent.trim()).filter(Boolean);
-}
-function csvEscape(s){
-  return '"' + (s || '').replaceAll('"','""') + '"';
-}
-function buildCSV(rows){
-  return rows.map(r => r.map(csvEscape).join(',')).join('\n');
-}
-function downloadBlob(content, mime, filename){
-  const a = document.createElement('a');
-  const blob = new Blob([content], {type: mime});
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
-}
-function safeName(s){
-  return (s || '').toLowerCase().replace(/[^a-z0-9\u0370-\u03FF\u1F00-\u1FFF\-]+/gi,'-').replace(/-+/g,'-').slice(0,80) || 'captions';
-}
-function nowStamp(){
-  const d = new Date();
-  return d.toISOString().replace(/[:.]/g,'-');
-}
-function downloadList(key, fmt){
-  const meta = getMeta();
-  const lines = getLinesFromList(key);
-  if(!lines.length){ okToast('Empty list'); return; }
-
-  if(fmt==='csv'){
-    const header = ["type","text","platform","tone","lang","topic","keywords","emojis","hashtags","generated_at"];
-    const rows = [header];
-    lines.forEach(t => rows.push([key, t, meta.platform, meta.tone, meta.lang, meta.topic, meta.keywords, meta.emojis, meta.hashtags, nowStamp()]));
-    const csv = buildCSV(rows);
-    downloadBlob(csv, "text/csv;charset=utf-8", `${safeName(meta.topic)}-${key}-${nowStamp()}.csv`);
-  } else {
-    downloadBlob(lines.join('\n'), "text/plain;charset=utf-8", `${safeName(meta.topic)}-${key}-${nowStamp()}.txt`);
-  }
-}
-function downloadAll(fmt){
-  const groups = ["hooks","captions","ctas"];
-  const meta = getMeta();
-  const collected = [];
-  groups.forEach(k=>{
-    getLinesFromList(k).forEach(t => collected.push({type:k, text:t}));
-  });
-  if(!collected.length){ okToast('Nothing to export'); return; }
-
-  if(fmt==='csv'){
-    const header = ["type","text","platform","tone","lang","topic","keywords","emojis","hashtags","generated_at"];
-    const rows = [header];
-    collected.forEach(row => rows.push([row.type, row.text, meta.platform, meta.tone, meta.lang, meta.topic, meta.keywords, meta.emojis, meta.hashtags, nowStamp()]));
-    downloadBlob(buildCSV(rows), "text/csv;charset=utf-8", `${safeName(meta.topic)}-ALL-${nowStamp()}.csv`);
-  } else {
-    const txt = collected.map(r=>`[${r.type}] ${r.text}`).join('\n');
-    downloadBlob(txt, "text/plain;charset=utf-8", `${safeName(meta.topic)}-ALL-${nowStamp()}.txt`);
-  }
-}
-
-/* ====== PRESETS (localStorage) ====== */
-const PRESETS_KEY = 'acs_captions_presets';
-function loadPresets(){
-  let map = {};
-  try { map = JSON.parse(localStorage.getItem(PRESETS_KEY) || '{}'); } catch(e){ map = {}; }
-  const sel = document.getElementById('presetSelect');
-  sel.innerHTML = '';
-  const names = Object.keys(map).sort((a,b)=>a.localeCompare(b));
-  names.forEach(n=>{
-    const opt = document.createElement('option'); opt.value=n; opt.textContent=n; sel.appendChild(opt);
-  });
-}
-function getFormValues(){
-  return {
-    topic:     document.getElementById('topic').value || '',
-    keywords:  document.getElementById('keywords').value || '',
-    platform:  document.getElementById('platform').value,
-    kind:      document.getElementById('kind').value,
-    lang:      document.getElementById('lang').value,
-    tone:      document.getElementById('tone').value,
-    n:         document.getElementById('n').value,
-    emojis:    document.getElementById('emojis').checked,
-    hashtags:  document.getElementById('hashtags').checked
-  };
-}
-function setFormValues(v){
-  document.getElementById('topic').value = v.topic || '';
-  document.getElementById('keywords').value = v.keywords || '';
-  document.getElementById('platform').value = v.platform || 'Instagram';
-  document.getElementById('kind').value = v.kind || 'captions';
-  document.getElementById('lang').value = v.lang || 'el';
-  document.getElementById('tone').value = v.tone || 'neutral';
-  document.getElementById('n').value = v.n || 6;
-  document.getElementById('emojis').checked = !!v.emojis;
-  document.getElementById('hashtags').checked = !!v.hashtags;
-}
-function savePreset(){
-  const name = document.getElementById('presetName').value.trim();
-  if(!name){ okToast('Δώσε όνομα preset'); return; }
-  let map = {};
-  try { map = JSON.parse(localStorage.getItem(PRESETS_KEY) || '{}'); } catch(e){ map = {}; }
-  map[name] = getFormValues();
-  localStorage.setItem(PRESETS_KEY, JSON.stringify(map));
-  loadPresets();
-  okToast('Preset saved');
-}
-function applyPreset(){
-  const sel = document.getElementById('presetSelect');
-  const name = sel.value;
-  if(!name){ okToast('Διάλεξε preset'); return; }
-  let map = {};
-  try { map = JSON.parse(localStorage.getItem(PRESETS_KEY) || '{}'); } catch(e){ map = {}; }
-  if(!map[name]){ okToast('Missing preset'); return; }
-  setFormValues(map[name]);
-  okToast('Preset loaded');
-}
-function deletePreset(){
-  const sel = document.getElementById('presetSelect');
-  const name = sel.value;
-  if(!name){ okToast('Διάλεξε preset'); return; }
-  let map = {};
-  try { map = JSON.parse(localStorage.getItem(PRESETS_KEY) || '{}'); } catch(e){ map = {}; }
-  delete map[name];
-  localStorage.setItem(PRESETS_KEY, JSON.stringify(map));
-  loadPresets();
-  okToast('Preset deleted');
-}
-function clearForm(){
-  setFormValues({topic:'',keywords:'',platform:'Instagram',kind:'captions',lang:'el',tone:'neutral',n:6,emojis:false,hashtags:false});
-}
-
-/* ====== tiny toast ====== */
-function okToast(msg){
-  const div = document.createElement('div');
-  div.textContent = msg;
-  div.style.position='fixed'; div.style.right='16px'; div.style.bottom='16px';
-  div.style.padding='8px 12px'; div.style.borderRadius='8px';
-  div.style.background='rgba(80,160,80,.9)'; div.style.color='#fff'; div.style.zIndex=9999;
-  document.body.appendChild(div);
-  setTimeout(()=>{div.remove()}, 1200);
-}
-
-/* init */
-document.addEventListener('DOMContentLoaded', loadPresets);
 </script>
 {% endblock %}

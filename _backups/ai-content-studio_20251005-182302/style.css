@@ -1,0 +1,158 @@
+/* === THEME VARIABLES === */
+:root {
+  --bg: #ffffff;
+  --text: #1f2937;     /* slate-800 */
+  --muted: #6b7280;    /* slate-500 */
+  --card: #ffffff;
+  --border: #e5e7eb;   /* slate-200 */
+  --brand: #0d6efd;    /* bootstrap primary */
+  --header-bg: #f8f9fa;
+  --header-text: #111827; /* slate-900 */
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f0f0f;
+  --text: #e5e7eb;     /* slate-200 */
+  --muted: #9ca3af;    /* slate-400 */
+  --card: #151515;
+  --border: #2a2a2a;
+  --brand: #3b82f6;    /* a bit softer in dark */
+  --header-bg: #141414;
+  --header-text: #f3f4f6;
+}
+
+/* system auto (όταν δεν έχει οριστεί manual theme) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #0f0f0f;
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+    --card: #151515;
+    --border: #2a2a2a;
+    --brand: #3b82f6;
+    --header-bg: #141414;
+    --header-text: #f3f4f6;
+  }
+}
+
+/* === BASE COLORS === */
+html, body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+header, .navbar, .topbar {
+  background: var(--header-bg) !important;
+  color: var(--header-text) !important;
+  border-bottom: 1px solid var(--border);
+}
+header a, .navbar a, .topbar a {
+  color: var(--header-text) !important;
+}
+
+/* Containers */
+main .container {
+  color: var(--text);
+}
+
+/* Cards */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.card .card-body { color: var(--text); }
+
+/* Forms */
+.form-control,
+.form-select {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.15);
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.btn-outline-secondary {
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn-outline-secondary:hover {
+  background: var(--card);
+}
+
+/* Text */
+.text-muted { color: var(--muted) !important; }
+
+/* Gallery grid helper (αν το χρειαστείς με απλά divs) */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+/* === NAVBAR & DROPDOWNS FIX (dark/auto visibility) === */
+
+/* 1) Links/brand στην μπάρα να ακολουθούν το header-text */
+.navbar .navbar-brand,
+.navbar .nav-link,
+.navbar .dropdown-toggle {
+  color: var(--header-text) !important;
+}
+
+/* 2) Toggler border και icon */
+.navbar .navbar-toggler {
+  border-color: var(--border);
+}
+
+/* Χρησιμοποιούμε data-URI SVG που αλλάζει μέσω CSS variables */
+:root {
+  --toggler-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%23111827' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22' /%3e%3c/svg%3e"); /* slate-900 */
+  --dropdown-bg: #ffffff;
+  --dropdown-text: #111827;
+}
+
+:root[data-theme="dark"] {
+  --toggler-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%23f3f4f6' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22' /%3e%3c/svg%3e"); /* very light */
+  --dropdown-bg: #1b1b1b;
+  --dropdown-text: #e5e7eb;
+}
+
+/* Auto mode (system dark) όταν δεν υπάρχει manual theme */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --toggler-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%23f3f4f6' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22' /%3e%3c/svg%3e");
+    --dropdown-bg: #1b1b1b;
+    --dropdown-text: #e5e7eb;
+  }
+}
+
+/* Εφαρμογή του icon */
+.navbar .navbar-toggler-icon {
+  background-image: var(--toggler-icon);
+}
+
+/* 3) Dropdown χρωματισμοί να είναι ευανάγνωστοι */
+.dropdown-menu {
+  background: var(--dropdown-bg);
+  color: var(--dropdown-text);
+  border-color: var(--border);
+}
+.dropdown-item {
+  color: var(--dropdown-text);
+}
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background: rgba(0,0,0,0.06); /* και στο dark είναι διακριτό */
+  color: var(--dropdown-text);
+}
+.dropdown-divider {
+  border-color: var(--border);
+}

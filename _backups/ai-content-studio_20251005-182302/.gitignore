@@ -1,0 +1,16 @@
+﻿# venv / IDE
+.venv/
+venv/
+.env
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+
+# local outputs (κρατάμε μόνο .gitkeep)
+static/outputs/*
+!static/outputs/.gitkeep
+
+# local logs/data (κρατάμε μόνο .gitkeep)
+data/*
+!data/.gitkeep

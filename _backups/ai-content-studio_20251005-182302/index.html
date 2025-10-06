@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="margin-top:40px; max-width: 980px;">
+  <h2>🎨 AI Content Studio</h2>
+  <p>Δώσε prompt για να δημιουργήσεις <strong>εικόνα</strong> ή <strong>λογότυπο</strong> (OpenAI DALL·E 3).</p>
+
+  <form method="post" id="genForm">
+    <div class="form-group">
+      <textarea name="prompt" rows="3" class="form-control"
+        placeholder="π.χ. Minimal sneaker logo with bold typography — Sneakerness.eu" required></textarea>
+    </div>
+
+    <div class="row g-2 mt-2">
+      <div class="col-md-4">
+        <label class="form-label">Content Type</label>
+        <select name="content_type" class="form-select" id="contentTypeSel">
+          <option value="image" selected>Image</option>
+          <option value="logo">Logo (PNG, transparent)</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Aspect</label>
+        <select name="aspect" class="form-select" id="aspectSelect">
+          {% for p in presets %}
+            <option value="{{ p.value }}"
+                    data-help="{{ p.label }}"
+                    data-size="{{ p.w }}×{{ p.h }}"
+                    {% if p.value == '1:1' %}selected{% endif %}>
+              {{ p.value }} — {{ p.label }} ({{ p.w }}×{{ p.h }})
+            </option>
+          {% endfor %}
+        </select>
+        <small id="aspectHelp" class="text-muted d-block mt-1">
+          Ιδανικό για: {{ presets[0].label }} — {{ presets[0].w }}×{{ presets[0].h }}
+        </small>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Watermark</label>
+        <select name="wm_style" class="form-select" id="wmStyleSel">
+          {% for s in wm_styles %}
+            <option value="{{ s }}" {% if s == 'soft' %}selected{% endif %}>{{ s|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="row g-2 mt-2" id="qualityRow">
+      <div class="col-md-6">
+        <label class="form-label">JPEG quality (images)</label>
+        <select name="quality" class="form-select">
+          <option value="92" selected>92 (default)</option>
+          <option value="85">85 (smaller file)</option>
+          <option value="98">98 (max)</option>
+        </select>
+      </div>
+      <div class="col-md-6 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="1" id="cloudOnlyChk" name="cloud_only">
+          <label class="form-check-label" for="cloudOnlyChk">
+            Save to Cloudinary only (skip local)
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-3" id="genBtn">Generate</button>
+    <a href="{{ url_for('gallery') }}" class="btn btn-secondary mt-3">📷 Gallery</a>
+
+    <div id="loading" style="display:none; margin-top:12px;">
+      <span class="spinner-border spinner-border-sm"></span>
+      <strong>Generating… please wait</strong>
+    </div>
+  </form>
+</div>
+
+<script>
+  // υπάρχουσα λογική
+  const form = document.getElementById('genForm');
+  const btn  = document.getElementById('genBtn');
+  const loading = document.getElementById('loading');
+  const typeSel = document.getElementById('contentTypeSel');
+  const wmSel   = document.getElementById('wmStyleSel');
+  const qualityRow = document.getElementById('qualityRow');
+
+  function syncUI() {
+    const isLogo = typeSel.value === 'logo';
+    if (isLogo) {
+      wmSel.value = 'none';
+      wmSel.disabled = true;
+      qualityRow.style.display = 'none';
+    } else {
+      wmSel.disabled = false;
+      qualityRow.style.display = 'flex';
+    }
+  }
+  typeSel.addEventListener('change', syncUI);
+  document.addEventListener('DOMContentLoaded', syncUI);
+
+  form.addEventListener('submit', () => {
+    btn.disabled = true;
+    loading.style.display = 'block';
+    setTimeout(() => { btn.disabled = false; loading.style.display = 'none'; }, 120000);
+  });
+
+  // ΝΕΟ: βοήθημα για Aspect/πλατφόρμες
+  const aspectSel  = document.getElementById('aspectSelect');
+  const aspectHelp = document.getElementById('aspectHelp');
+  function updateAspectHelp() {
+    const opt  = aspectSel.selectedOptions[0];
+    if (!opt) return;
+    const help = opt.getAttribute('data-help') || '';
+    const sz   = opt.getAttribute('data-size') || '';
+    aspectHelp.textContent = `Ιδανικό για: ${help} — ${sz}`;
+  }
+  aspectSel.addEventListener('change', updateAspectHelp);
+  document.addEventListener('DOMContentLoaded', updateAspectHelp);
+</script>
+{% endblock %}

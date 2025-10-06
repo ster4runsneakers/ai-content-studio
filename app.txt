@@ -1,0 +1,299 @@
+import os, io, json, zipfile
+from datetime import datetime
+from pathlib import Path
+from flask import Flask, render_template, request, redirect, url_for, send_file
+
+# === Robust .env loader + OPENAI key normalizer ===
+from dotenv import load_dotenv, find_dotenv
+
+_ZERO_WIDTH = "".join(map(chr, [0x200B,0x200C,0x200D,0x200E,0x200F,0x202A,0x202B,0x202C,0x202D,0x202E]))
+
+def _mask(s: str):
+    return (s[:8] + "…" + s[-6:]) if s and len(s) > 16 else ("EMPTY" if not s else "SHORT")
+
+def _clean_val(v: str) -> str:
+    if v is None:
+        return ""
+    v = v.strip().strip('"').strip("'")
+    v = v.replace("—","-").replace("–","-").replace("…","")  # en/em dash, ellipsis
+    v = "".join(ch for ch in v if ch not in _ZERO_WIDTH)      # zero-width/bidi
+    return v.strip()
+
+def _force_env_from_file(path: str):
+    """Διάβασε .env/.env.override και καθάρισε ΚΑΙ keys ΚΑΙ values."""
+    if not path or not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8-sig") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k = "".join(ch for ch in k.strip() if (ch == "_" or (ch.isascii() and ch.isalnum()))).upper()
+            v = _clean_val(v)
+            if not k:
+                continue
+            # ΜΗΝ πατάς ήδη «καλό» OPENAI key
+            if k == "OPENAI_API_KEY" and os.environ.get("OPENAI_API_KEY","").startswith("sk-"):
+                continue
+            os.environ[k] = v
+
+dotenv_main = find_dotenv(usecwd=True)
+load_dotenv(dotenv_path=dotenv_main, override=False)
+_force_env_from_file(dotenv_main)
+
+dotenv_override = os.path.join(os.getcwd(), ".env.override")
+if os.path.exists(dotenv_override):
+    load_dotenv(dotenv_path=dotenv_override, override=True)
+    _force_env_from_file(dotenv_override)
+
+print("DOTENV used from:", dotenv_main or "NOT FOUND")
+if os.path.exists(dotenv_override):
+    print("DOTENV override:", dotenv_override)
+# === /env loader ===
+
+# === Flask app ===
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY") or "dev-secret"
+
+# === Config: OpenAI / Cloudinary / CSE ===
+from openai import OpenAI
+_raw_key = os.getenv("OPENAI_API_KEY")
+OPENAI_KEY = _clean_val(_raw_key)
+_bad = [(i, hex(ord(c))) for i,c in enumerate(OPENAI_KEY) if (ord(c)>127 or c.isspace())]
+print(f"OPENAI DEBUG len={len(OPENAI_KEY)} last6={OPENAI_KEY[-6:] if OPENAI_KEY else 'EMPTY'} bad={_bad if _bad else 'OK'}")
+client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
+
+import cloudinary, cloudinary.uploader
+CLOUDINARY_URL = os.getenv("CLOUDINARY_URL") or ""
+CLOUDINARY_FOLDER = (os.getenv("CLOUDINARY_FOLDER") or "ai-content-studio-1").strip("/")
+if CLOUDINARY_URL:
+    cloudinary.config(cloudinary_url=CLOUDINARY_URL)
+print(f"Cloudinary: {'ON' if CLOUDINARY_URL else 'OFF'} → folder: {CLOUDINARY_FOLDER or '(default)'}")
+
+# CSE -> κράτα και στο app.config
+app.config["GOOGLE_CSE_KEY"] = _clean_val(os.getenv("GOOGLE_CSE_KEY") or "")
+app.config["GOOGLE_CSE_ID"]  = _clean_val(os.getenv("GOOGLE_CSE_ID")  or "")
+print("CSE DEBUG key=", _mask(app.config["GOOGLE_CSE_KEY"]), "cx=", app.config["GOOGLE_CSE_ID"] or "EMPTY")
+
+# === Paths / constants ===
+BASE_DIR   = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+OUTPUT_DIR = STATIC_DIR / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+LOG_PATH   = BASE_DIR / "logs.json"
+
+ASPECT_SIZES = {
+    "1:1":       (1024, 1024),
+    "9:16":      (1024, 1820),
+    "4:5":       (1024, 1280),
+    "16:9":      (1280, 720),
+    "Facebook":  (1200, 628),
+    "Pinterest": (1000, 1500),
+}
+ASPECT_PRESETS = [
+    {"value":"1:1",       "w":1024, "h":1024, "label":"Square — Instagram Grid, Facebook, Ads"},
+    {"value":"9:16",      "w":1024, "h":1820, "label":"Vertical 9:16 — TikTok, Reels, Shorts"},
+    {"value":"4:5",       "w":1024, "h":1280, "label":"Portrait 4:5 — Instagram Feed"},
+    {"value":"16:9",      "w":1280, "h":720,  "label":"Wide 16:9 — YouTube, Website Banners"},
+    {"value":"Facebook",  "w":1200, "h":628,  "label":"Facebook Link/Feed Ads"},
+    {"value":"Pinterest", "w":1000, "h":1500, "label":"Pinterest Pins"},
+]
+
+def append_log(entry: dict):
+    try:
+        data = []
+        if LOG_PATH.exists():
+            data = json.loads(LOG_PATH.read_text(encoding="utf-8"))
+        data.append(entry)
+        LOG_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        print("append_log error:", e)
+
+# === Navbar (Home, Captions pinned; υπόλοιπα στο dropdown) ===
+NAV_CATALOG = [
+    {"label": "Home",     "candidates": ["index"],        "pinned": True},
+    {"label": "Captions", "candidates": ["captions"],     "pinned": True},
+    {"label": "Upload",       "candidates": ["media.upload","upload"], "pinned": False},
+    {"label": "CSE",          "candidates": ["media.cse","cse"],       "pinned": False},
+    {"label": "Gallery",      "candidates": ["gallery"],               "pinned": False},
+    {"label": "My Snippets",  "candidates": ["snip.index","snippets"], "pinned": False},
+    {"label": "Logs",         "candidates": ["logs"],                  "pinned": False},
+    {"label": "Backup (ZIP)", "candidates": ["backup"],                "pinned": False},
+]
+
+@app.context_processor
+def inject_nav():
+    existing = set(app.view_functions.keys())
+    def first_existing(ep_list):
+        for ep in ep_list:
+            if ep in existing:
+                return ep
+        return None
+    pinned = []
+    more = []
+    for item in NAV_CATALOG:
+        ep = first_existing(item.get("candidates", []))
+        if not ep:
+            continue
+        entry = {"label": item["label"], "endpoint": ep}
+        (pinned if item.get("pinned") else more).append(entry)
+    return {"nav_pinned": pinned, "nav_more": more}
+
+# === OpenAI captions (νέος client) ===
+def generate_captions(topic, n=6, platform="Instagram", kind="all", lang="el",
+                      tone="energetic", keywords="", emojis=True, hashtags=True,
+                      model="gpt-4o-mini"):
+    if not client:
+        raise RuntimeError("OPENAI_API_KEY is missing")
+    want = {
+        "hooks":    kind in ("hooks","all"),
+        "captions": kind in ("captions","all"),
+        "ctas":     kind in ("ctas","all"),
+    }
+    extra = []
+    if emojis:   extra.append("use relevant emojis")
+    if hashtags: extra.append("include relevant hashtags")
+    if keywords: extra.append(f"weave in these keywords: {keywords}")
+
+    prompt = f"""You are a social media copywriter. Write {n} short lines for {platform}.
+Language: {"Greek" if lang=="el" else "English"}. Tone: {tone}.
+Topic: {topic}.
+Include: {", ".join(extra) if extra else "clean text"}.
+Return only a plain list of lines (no headings). Kinds: hooks={want['hooks']}, captions={want['captions']}, ctas={want['ctas']}."""
+    msgs = [
+        {"role":"system","content":"Be concise. Each line should be a usable post line."},
+        {"role":"user","content": prompt}
+    ]
+    r = client.chat.completions.create(
+        model=model,
+        messages=msgs,
+        temperature=0.7,
+    )
+    text = r.choices[0].message.content or ""
+    lines = [
+        ln.strip().lstrip("•-").lstrip("0123456789. ").strip()
+        for ln in text.splitlines() if ln.strip()
+    ]
+    hooks, caps, ctas = [], [], []
+    for ln in lines:
+        low = ln.lower()
+        if any(k in low for k in ("buy now","shop now","κάνε τώρα","πάτα το link","order","αγόρασε","παράγγειλε")):
+            ctas.append(ln)
+        elif any(k in low for k in ("limited","now","σήμερα","τελευταία","offer","προσφορά","μόνο σήμερα")):
+            hooks.append(ln)
+        else:
+            caps.append(ln)
+    return {"hooks": hooks[:n], "captions": caps[:n], "ctas": ctas[:n]}
+
+# === Core routes ===
+@app.route("/")
+def index():
+    return render_template("index.html",
+                           aspects=list(ASPECT_SIZES.keys()),
+                           presets=ASPECT_PRESETS)
+
+@app.route("/captions", methods=["GET","POST"])
+def captions():
+    error = None
+    topic    = request.form.get("topic","")
+    tone     = request.form.get("tone","energetic")
+    platform = request.form.get("platform","Instagram")
+    kind     = request.form.get("kind","all")
+    lang     = request.form.get("lang","el")
+    n        = int(request.form.get("n","6") or 6)
+    keywords = request.form.get("keywords","")
+    emojis   = bool(request.form.get("emojis"))
+    hashtags = bool(request.form.get("hashtags"))
+
+    results = {"hooks":[], "captions":[], "ctas":[]}
+    if request.method == "POST":
+        if not topic.strip():
+            error = "Γράψε θέμα/προϊόν."
+        else:
+            try:
+                results = generate_captions(topic=topic, n=n, platform=platform, kind=kind,
+                                            lang=lang, tone=tone, keywords=keywords,
+                                            emojis=emojis, hashtags=hashtags)
+            except Exception as e:
+                error = f"{e}"
+
+    return render_template("captions.html",
+                           error=error, topic=topic, tone=tone, platform=platform, kind=kind,
+                           lang=lang, n=n, keywords=keywords, emojis=emojis, hashtags=hashtags,
+                           results=results)
+
+@app.route("/gallery")
+def gallery():
+    images = []
+    for p in sorted(OUTPUT_DIR.glob("*.jpg")):
+        images.append({
+            "name": p.name,
+            "path": f"/static/outputs/{p.name}",
+            "mtime": datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+        })
+    return render_template("gallery.html", images=images)
+
+@app.route("/logs")
+def logs():
+    data = []
+    if LOG_PATH.exists():
+        try:
+            data = json.loads(LOG_PATH.read_text(encoding="utf-8"))
+        except:
+            data = []
+    return render_template("logs.html", logs=data)
+
+# Backup (ZIP). Προεπιλογή: ΧΩΡΙΣ .env — με ?with_env=1 περιλαμβάνει .env
+@app.route("/backup")
+def backup():
+    with_env = request.args.get("with_env","0") == "1"
+    project_root = BASE_DIR
+    memory_file = io.BytesIO()
+    exclude_dirs = {".git", ".venv", "__pycache__", "_backups"}
+    exclude_ext  = {".pyc",".pyo",".zip"}
+    with zipfile.ZipFile(memory_file, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in project_root.rglob("*"):
+            rel = path.relative_to(project_root)
+            if any(part in exclude_dirs for part in rel.parts):
+                continue
+            if path.is_file():
+                if path.suffix.lower() in exclude_ext:
+                    continue
+                if (not with_env) and path.name == ".env":
+                    continue
+                zf.write(path, arcname=str(rel))
+    memory_file.seek(0)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    name = f"ai-content-studio_{stamp}.zip"
+    return send_file(memory_file, as_attachment=True, download_name=name, mimetype="application/zip")
+
+# Προαιρετικό: inspector endpoints
+@app.route("/__endpoints")
+def __endpoints():
+    return "<pre>" + "\n".join(sorted(app.view_functions.keys())) + "</pre>"
+
+# === Blueprints ===
+try:
+    from routes_media import media_bp
+    app.register_blueprint(media_bp)
+    print("Blueprint: media ✅")
+except Exception as e:
+    print("Blueprint: media ❌", e)
+
+try:
+    from routes_snippets import snip_bp
+    app.register_blueprint(snip_bp)
+    print("Blueprint: snippets ✅")
+except Exception as e:
+    print("Blueprint: snippets ❌", e)
+
+try:
+    from routes_ab import ab_bp
+    app.register_blueprint(ab_bp)
+    print("Blueprint: ab ✅")
+except Exception as e:
+    print("Blueprint: ab ❌", e)
+
+if __name__ == "__main__":
+    app.run(debug=True)

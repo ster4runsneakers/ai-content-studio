@@ -1,95 +1,86 @@
 {% extends "base.html" %}
-{% block title %}CSE (Pro){% endblock %}
 {% block content %}
 <div class="container py-4">
-  <h3 class="mb-3">Google CSE — Pro</h3>
+  <h2 class="mb-3">Google CSE (εικόνες)</h2>
 
   {% if error %}
-    <div class="alert alert-danger">{{ error }}</div>
+  <div class="alert alert-danger">{{ error }}</div>
   {% endif %}
 
-  <form method="post" class="card card-body mb-4">
-    <div class="row g-3">
-      <div class="col-12 col-md-5">
-        <label class="form-label">Query</label>
-        <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="π.χ. sneaker lifestyle, runner on beach">
+  <form method="POST" class="card shadow-sm mb-4">
+    <div class="card-body row g-3">
+      <div class="col-12 col-lg-6">
+        <label class="form-label">Αναζήτηση</label>
+        <input type="text" name="q" value="{{ q or '' }}" class="form-control" placeholder="π.χ. sneakers summer">
       </div>
-
-      <div class="col-6 col-md-2">
+      <div class="col-6 col-lg-2">
         <label class="form-label">Aspect</label>
-        <select class="form-select" name="aspect">
-          <option value="any" {% if aspect=='any' %}selected{% endif %}>Any</option>
+        <select name="aspect" class="form-select">
+          <option value="any" {{ 'selected' if aspect=='any' else '' }}>Any</option>
           {% for a in aspects %}
-          <option value="{{a}}" {% if aspect==a %}selected{% endif %}>{{a}}</option>
+          <option value="{{ a }}" {{ 'selected' if a==aspect else '' }}>{{ a }}</option>
           {% endfor %}
         </select>
       </div>
-
-      <div class="col-6 col-md-2">
+      <div class="col-6 col-lg-2">
         <label class="form-label">Type</label>
-        <select class="form-select" name="img_type">
-          <option value="">Any</option>
-          {% for t in ["photo","clipart","lineart","animated","face","news"] %}
-          <option value="{{t}}" {% if img_type==t %}selected{% endif %}>{{t|capitalize}}</option>
-          {% endfor %}
+        <select name="img_type" class="form-select">
+          <option value="" {{ 'selected' if img_type=='' else '' }}>Any</option>
+          <option value="photo" {{ 'selected' if img_type=='photo' else '' }}>Photo</option>
+          <option value="clipart" {{ 'selected' if img_type=='clipart' else '' }}>Clipart</option>
+          <option value="lineart" {{ 'selected' if img_type=='lineart' else '' }}>Lineart</option>
+          <option value="face" {{ 'selected' if img_type=='face' else '' }}>Face</option>
         </select>
       </div>
-
-      <div class="col-6 col-md-2">
+      <div class="col-6 col-lg-1">
         <label class="form-label">Size</label>
-        <select class="form-select" name="img_size">
-          <option value="">Any</option>
-          {% for s in ["icon","small","medium","large","xlarge","xxlarge","huge"] %}
-          <option value="{{s}}" {% if img_size==s %}selected{% endif %}>{{s}}</option>
-          {% endfor %}
+        <select name="img_size" class="form-select">
+          <option value="" {{ 'selected' if img_size=='' else '' }}>Any</option>
+          <option value="medium" {{ 'selected' if img_size=='medium' else '' }}>Medium</option>
+          <option value="xlarge" {{ 'selected' if img_size=='xlarge' else '' }}>XLarge</option>
+          <option value="huge" {{ 'selected' if img_size=='huge' else '' }}>Huge</option>
         </select>
       </div>
-
-      <div class="col-6 col-md-1">
+      <div class="col-6 col-lg-1">
         <label class="form-label">Safe</label>
-        <select class="form-select" name="safe">
-          {% for s in ["off","medium","high"] %}
-          <option value="{{s}}" {% if safe==s %}selected{% endif %}>{{s|capitalize}}</option>
-          {% endfor %}
+        <select name="safe" class="form-select">
+          <option value="off" {{ 'selected' if safe=='off' else '' }}>Off</option>
+          <option value="medium" {{ 'selected' if safe=='medium' else '' }}>Medium</option>
+          <option value="high" {{ 'selected' if safe=='high' else '' }}>High</option>
         </select>
       </div>
-
-      <div class="col-12 col-md-12 d-grid">
-        <button class="btn btn-dark">Search</button>
+      <div class="col-12 col-lg-12">
+        <button class="btn btn-primary">Search</button>
       </div>
     </div>
   </form>
 
   {% if results and results|length %}
-  <div class="row g-3">
-    {% for r in results %}
-    <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-      <div class="card h-100">
-        {% if r.thumbnail %}
-          <img src="{{ r.thumbnail }}" class="card-img-top" alt="">
-        {% endif %}
-        <div class="card-body d-flex flex-column">
-          <div class="mb-2">
-            <div class="small text-muted">{{ r.width }}×{{ r.height }}</div>
-            <a class="small" href="{{ r.link }}" target="_blank">{{ r.title or 'Open' }}</a>
-          </div>
-          <div class="mt-auto d-grid gap-2">
-            <form method="post" action="{{ url_for('media.import_remote') }}">
-              <input type="hidden" name="src" value="{{ r.link }}">
-              <input type="hidden" name="aspect" value="{{ aspect if aspect!='any' else '1:1' }}">
-              <input type="hidden" name="wm_style" value="soft">
-              <input type="hidden" name="quality" value="92">
-              <button class="btn btn-sm btn-outline-primary" type="submit">Send to Upload</button>
-            </form>
-            <a class="btn btn-sm btn-outline-secondary" href="{{ r.link }}" target="_blank">Open image</a>
-          </div>
+  <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+    {% for it in results %}
+    <div class="col">
+      <div class="card h-100 shadow-sm">
+        <img src="{{ it.thumbnail or it.link }}" class="card-img-top" alt="{{ it.title|default('img') }}">
+        <div class="card-body">
+          <div class="small text-muted mb-2">{{ it.width }}×{{ it.height }}</div>
+          <div class="text-truncate" title="{{ it.title }}">{{ it.title }}</div>
+        </div>
+        <div class="card-footer bg-white">
+          <form method="POST" action="{{ url_for('media.import') }}" class="d-grid gap-2">
+            <input type="hidden" name="src" value="{{ it.link }}">
+            <input type="hidden" name="aspect" value="{{ aspect if aspect!='any' else '1:1' }}">
+            <input type="hidden" name="wm_style" value="soft">
+            <input type="hidden" name="quality" value="92">
+            <button class="btn btn-outline-primary btn-sm">Send to Upload</button>
+          </form>
+          <a href="{{ it.link }}" target="_blank" class="btn btn-link btn-sm">Open original</a>
         </div>
       </div>
     </div>
     {% endfor %}
   </div>
-  {% else %}
-    <div class="alert alert-light">Δώσε αναζήτηση και φίλτρα (Type/Size/Safe). Μετά μπορείς να στείλεις εικόνα κατευθείαν στο Upload.</div>
+  {% elif q %}
+  <div class="alert alert-warning">Δεν βρέθηκαν αποτελέσματα.</div>
   {% endif %}
 </div>
 {% endblock %}

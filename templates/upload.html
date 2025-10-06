@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-3">Upload / Import εικόνας</h2>
+
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" enctype="multipart/form-data" class="row g-3">
+    <!-- Αριστερά: επιλογές -->
+    <div class="col-12 col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">Αρχείο εικόνας (ή βάλε URL δεξιά)</label>
+            <input type="file" name="file" accept="image/*" class="form-control">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Aspect / Preset διαστάσεων</label>
+            <select name="aspect" class="form-select">
+              {% if '1:1' in aspects %}
+              <option value="1:1" selected>1:1 (Square)</option>
+              {% endif %}
+              {% for a in aspects %}
+                {% if a != '1:1' %}
+                <option value="{{ a }}">{{ a }}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+            <div class="form-text">Η εικόνα θα γίνει resize στις επιλεγμένες διαστάσεις.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Watermark</label>
+            <select name="wm_style" class="form-select">
+              <option value="soft" selected>Soft (γωνία)</option>
+              <option value="badge">Badge (μαύρο στρογγυλεμένο)</option>
+              <option value="none">Χωρίς</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Quality (JPG)</label>
+            <input type="range" name="quality" min="60" max="100" value="92" class="form-range">
+          </div>
+
+          <button type="submit" class="btn btn-primary">Αποθήκευση</button>
+          <a href="{{ url_for('gallery') }}" class="btn btn-outline-secondary">Gallery</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Δεξιά: URL import + presets βοήθεια -->
+    <div class="col-12 col-lg-7">
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <label class="form-label">Ή επικόλλησε URL εικόνας (import)</label>
+          <input type="url" name="src" value="{{ src or '' }}" class="form-control" placeholder="https://…/image.jpg">
+          <div class="form-text">Αν συμπληρώσεις URL, αγνοείται το αρχείο.</div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-header">Συχνά presets</div>
+        <div class="card-body">
+          <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
+            {% for p in presets %}
+            <div class="col">
+              <div class="border rounded p-3 h-100">
+                <div class="fw-bold">{{ p.value }}</div>
+                <div class="small text-muted">{{ p.w }}×{{ p.h }}</div>
+                <div class="small">{{ p.label }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="small text-muted mt-2">Το επιλεγμένο aspect παραπάνω θα εφαρμόσει τις διαστάσεις.</div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

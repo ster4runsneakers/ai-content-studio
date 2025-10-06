@@ -1,17 +1,18 @@
+# routes_media.py
 import os, io, requests
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
-from flask import Blueprint, render_template, request, redirect, url_for, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, send_file, current_app
 
 media_bp = Blueprint("media", __name__)
 
-# Paths
-BASE_DIR   = os.path.abspath(os.path.dirname(__file__))
+# --- Paths / Config ---
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 OUTPUT_DIR = os.path.join(STATIC_DIR, "outputs")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Aspect presets
+# --- Aspect presets (ίδια λογική με app.py) ---
 ASPECT_SIZES = {
     "1:1":       (1024, 1024),
     "9:16":      (1024, 1820),
@@ -29,13 +30,14 @@ ASPECT_PRESETS = [
     {"value":"Pinterest", "w":1000, "h":1500, "label":"Pinterest Pins"},
 ]
 
-# Cloudinary (προαιρετικό)
+# --- Cloudinary (προαιρετικό) ---
 import cloudinary, cloudinary.uploader
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL") or ""
-CLOUDINARY_FOLDER = (os.getenv("CLOUDINARY_FOLDER") or "ai-content-studio-1").strip("/")
+CLOUDINARY_FOLDER = (os.getenv("CLOUDINARY_FOLDER") or "ai-content-studio").strip("/")
 if CLOUDINARY_URL:
     cloudinary.config(cloudinary_url=CLOUDINARY_URL)
 
+# --- Helpers ---
 def add_watermark(pil_img, text="Sneakerness.eu", style="soft"):
     if style == "none" or not text:
         return pil_img
@@ -65,22 +67,18 @@ def add_watermark(pil_img, text="Sneakerness.eu", style="soft"):
         draw.text((x, y), text, font=font, fill=(255,255,255,220))
     return Image.alpha_composite(img, overlay).convert("RGB")
 
-def _pil_to_bytes(pil_img, fmt="jpg", quality=92):
+def upload_pil_to_cloudinary(pil_img, public_id, fmt="jpg", tags=None):
+    if not CLOUDINARY_URL:
+        return None
     buf = io.BytesIO()
-    fmt = (fmt or "jpg").lower()
+    fmt = fmt.lower()
     if fmt in ("jpg","jpeg"):
-        if pil_img.mode != "RGB": pil_img = pil_img.convert("RGB")
-        pil_img.save(buf, format="JPEG", quality=quality)
+        pil_img = pil_img.convert("RGB")
+        pil_img.save(buf, format="JPEG", quality=92)
     else:
         if pil_img.mode != "RGBA": pil_img = pil_img.convert("RGBA")
         pil_img.save(buf, format="PNG")
     buf.seek(0)
-    return buf
-
-def upload_pil_to_cloudinary(pil_img, public_id, fmt="jpg", tags=None):
-    if not CLOUDINARY_URL:
-        return None
-    buf = _pil_to_bytes(pil_img, fmt=fmt, quality=92)
     res = cloudinary.uploader.upload(
         buf,
         folder=CLOUDINARY_FOLDER,
@@ -91,6 +89,16 @@ def upload_pil_to_cloudinary(pil_img, public_id, fmt="jpg", tags=None):
     )
     return res.get("secure_url")
 
+def save_local(pil_img, out_path, quality=92, as_png=False):
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    if as_png:
+        if pil_img.mode != "RGBA": pil_img = pil_img.convert("RGBA")
+        pil_img.save(out_path)
+    else:
+        pil_img = pil_img.convert("RGB")
+        pil_img.save(out_path, quality=quality)
+    return out_path
+
 # ---------- /upload ----------
 @media_bp.route("/upload", methods=["GET","POST"])
 def upload():
@@ -98,11 +106,8 @@ def upload():
     src_url = (request.args.get("src") or request.form.get("src") or "").strip()
     if request.method == "POST":
         wm_style = (request.form.get("wm_style") or "soft").strip()
+        quality = int(request.form.get("quality") or 92)
         aspect  = (request.form.get("aspect") or "1:1").strip()
-        try:
-            quality = int(request.form.get("quality") or 92)
-        except:
-            quality = 92
 
         try:
             if src_url:
@@ -128,15 +133,15 @@ def upload():
             safe_aspect = aspect.replace(":", "x")
             public_id = f"upload_{safe_aspect}_{ts}"
 
+            cloud_url = None
             if CLOUDINARY_URL:
-                _ = upload_pil_to_cloudinary(
+                cloud_url = upload_pil_to_cloudinary(
                     img, public_id=public_id, fmt="jpg",
                     tags=[f"aspect:{safe_aspect}", "type:upload", f"wm:{wm_style}"]
                 )
 
             out_path = os.path.join(OUTPUT_DIR, f"{public_id}.jpg")
-            if img.mode != "RGB": img = img.convert("RGB")
-            img.save(out_path, quality=quality)
+            save_local(img, out_path, quality=quality, as_png=False)
 
             return redirect(url_for("gallery"))
         except Exception as e:
@@ -150,9 +155,10 @@ def upload():
 @media_bp.route("/cse", methods=["GET","POST"])
 def cse():
     results, error, q = [], None, ""
+
     # keys: προτίμησε app.config, αλλιώς .env
-    key = current_app.config.get("GOOGLE_CSE_KEY") or os.getenv("GOOGLE_CSE_KEY") or ""
-    cx  = current_app.config.get("GOOGLE_CSE_ID")  or os.getenv("GOOGLE_CSE_ID")  or ""
+    key = current_app.config.get("GOOGLE_CSE_KEY") or os.getenv("GOOGLE_CSE_KEY")
+    cx  = current_app.config.get("GOOGLE_CSE_ID")  or os.getenv("GOOGLE_CSE_ID")
 
     # UI defaults
     aspect   = (request.form.get("aspect") or request.args.get("aspect") or "any").strip()
@@ -217,7 +223,7 @@ def cse():
 @media_bp.route("/media/import", methods=["POST"])
 def import_remote():
     src = (request.form.get("src") or "").strip()
-    aspect   = (request.form.get("aspect") or "1:1").strip()
+    aspect = (request.form.get("aspect") or "1:1").strip()
     wm_style = (request.form.get("wm_style") or "soft").strip()
     try:
         quality = int(request.form.get("quality") or 92)
@@ -250,8 +256,7 @@ def import_remote():
             )
 
         out_path = os.path.join(OUTPUT_DIR, f"{public_id}.jpg")
-        if img.mode != "RGB": img = img.convert("RGB")
-        img.save(out_path, quality=quality)
+        save_local(img, out_path, quality=quality, as_png=False)
 
         return redirect(url_for("gallery"))
     except Exception as e:

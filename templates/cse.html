@@ -66,7 +66,7 @@
           <div class="text-truncate" title="{{ it.title }}">{{ it.title }}</div>
         </div>
         <div class="card-footer bg-white">
-          <form method="POST" action="{{ url_for('media.import') }}" class="d-grid gap-2">
+          <form method="POST" action="{{ url_for('media.import_remote') }}" class="d-grid gap-2">
             <input type="hidden" name="src" value="{{ it.link }}">
             <input type="hidden" name="aspect" value="{{ aspect if aspect!='any' else '1:1' }}">
             <input type="hidden" name="wm_style" value="soft">

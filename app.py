@@ -1,7 +1,7 @@
-import os, io, json, zipfile, re
+import os, io, json, zipfile, re, tempfile, shutil
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, request, redirect, url_for, send_file
+from flask import Flask, render_template, request, send_file, abort
 from dotenv import load_dotenv, find_dotenv
 
 # ---------- .env + cleanup ----------
@@ -65,7 +65,7 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 OUTPUT_DIR = STATIC_DIR / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-LOG_PATH = BASE_DIR / "logs.json"
+LOG_PATH = BASE_DIR / "logs.json"  # JSON array
 
 ASPECT_SIZES = {
     "1:1": (1024,1024), "9:16": (1024,1820), "4:5": (1024,1280), "16:9": (1280,720),
@@ -172,7 +172,7 @@ Constraints:
         tags = [t for t in tags if t]
         data["hashtags"] = tags[:15]
     except Exception:
-        # Fallback (σπάνιο)
+        # Fallback parser (σπάνιο)
         lines = [ln.strip().lstrip("•-").lstrip("0123456789. ").strip() for ln in raw.splitlines() if ln.strip()]
         hooks, caps, ctas = [], [], []
         for ln in lines:
@@ -242,7 +242,6 @@ def captions():
                            error=error, topic=topic, tone=tone, platform=platform, kind=kind,
                            lang=lang, n=n, keywords=keywords, emojis=emojis, hashtags=hashtags,
                            results=results, hashtags_line=hashtags_line)
-      
 
 @app.route("/gallery")
 def gallery():
@@ -252,16 +251,21 @@ def gallery():
                        "mtime": datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")})
     return render_template("gallery.html", images=images)
 
-@app.route("/logs")
-def logs():
+# Use unique function name but keep endpoint="logs" for navbar candidates
+@app.route("/logs", endpoint="logs")
+def logs_page():
     data=[]
     if LOG_PATH.exists():
-        try: data = json.loads(LOG_PATH.read_text(encoding="utf-8"))
-        except: data = []
+        try:
+            # Υποστηρίζει JSON array στο logs.json
+            data = json.loads(LOG_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            data = []
     return render_template("logs.html", logs=data)
 
-@app.route("/backup")
-def backup():
+# Simple project backup (ολόκληρο project, exclude λίστες)
+@app.route("/backup", endpoint="backup")
+def backup_page():
     with_env = request.args.get("with_env","0") == "1"
     project_root = BASE_DIR
     memory_file = io.BytesIO()
@@ -283,6 +287,10 @@ def backup():
 def __endpoints():
     return "<pre>" + "\n".join(sorted(app.view_functions.keys())) + "</pre>"
 
+@app.route("/health")
+def health():
+    return "ok", 200
+
 # ---------- Blueprints ----------
 try:
     from routes_media import media_bp
@@ -300,83 +308,6 @@ try:
 except Exception as e:
     print("Blueprint: ab ❌", e)
 
-@app.route("/logs")
-def logs():
-    """Απλά debug logs από data/logs.jsonl (πιο πρόσφατα πρώτα)."""
-    if not os.path.exists(LOG_PATH):
-        entries = []
-    else:
-        with open(LOG_PATH, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        entries = [json.loads(ln) for ln in lines if ln.strip()]
-        entries.reverse()
-    return render_template("logs.html", entries=entries)
-
-@app.route("/backup")
-def backup():
-    """Δημιουργεί ZIP του static/outputs και το κατεβάζει."""
-    if not os.path.isdir(OUTPUT_DIR):
-        abort(404)
-    # temp zip
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    tmp_dir = tempfile.mkdtemp()
-    zip_base = os.path.join(tmp_dir, f"outputs_{ts}")
-    zip_path = shutil.make_archive(zip_base, "zip", OUTPUT_DIR)
-    return send_file(zip_path, as_attachment=True, download_name=f"outputs_{ts}.zip")
-
-@app.route("/health")
-def health():
-    return "ok", 200
-
-# ==== /captions route (platform/kind/lang/keywords + emojis/hashtags) ====
-from flask import request, render_template
-
-@app.route("/captions", methods=["GET","POST"])
-def captions():
-    error = None
-    topic = ""
-    tone = "neutral"
-    n = 6
-    platform = "Instagram"
-    kind = "captions"   # captions | hooks | ctas | all
-    lang = "el"         # el | en
-    keywords = ""
-    emojis = False
-    hashtags = False
-
-    results = {}
-
-    if request.method == "POST":
-        topic = (request.form.get("topic") or "").strip()
-        tone = (request.form.get("tone") or "neutral").strip()
-        platform = (request.form.get("platform") or "Instagram").strip()
-        kind = (request.form.get("kind") or "captions").strip()
-        lang = (request.form.get("lang") or "el").strip()
-        keywords = (request.form.get("keywords") or "").strip()
-        emojis = bool(request.form.get("emojis"))
-        hashtags = bool(request.form.get("hashtags"))
-        try:
-            n = int(request.form.get("n") or 6)
-        except:
-            n = 6
-
-        try:
-            if not topic:
-                raise RuntimeError("Γράψε θέμα/προϊόν.")
-            results = generate_social_bundle(topic, tone, n, platform, kind, lang, keywords,
-                                             use_emojis=emojis, use_hashtags=hashtags)
-        except Exception as e:
-            error = str(e)
-
-    return render_template("captions.html",
-                           error=error,
-                           topic=topic, tone=tone, n=n,
-                           platform=platform, kind=kind, lang=lang, keywords=keywords,
-                           emojis=emojis, hashtags=hashtags,
-                           results=results)
-# ==== /end captions route ====
-
-
-
+# ---------- Main ----------
 if __name__ == "__main__":
     app.run(debug=True)
